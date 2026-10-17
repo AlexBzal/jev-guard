@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JEV Guard · 30X</title>
+  <meta name="description" content="Guardián en tiempo real para los agentes internos de 30X, construido sobre JEV de TypeSafe AI.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M16 3 5 7v8c0 7 4.7 12 11 14 6.3-2 11-7 11-14V7z' fill='%232a78d6'/%3E%3Cpath d='m11 16 4 4 7-8' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/css/app.css">
+  <script>
+    // Aplica el tema guardado antes de pintar, para evitar un parpadeo.
+    try { const t = localStorage.getItem("jevguard-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+  </script>
+</head>
+<body>
+  <a class="skip" href="#view">Saltar al contenido</a>
+  <header class="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 5 7v8c0 7 4.7 12 11 14 6.3-2 11-7 11-14V7z"/><path class="tick" d="m11 16 4 4 7-8"/></svg>
+      <div>
+        <strong>JEV Guard</strong>
+        <span>Guardián de agentes de 30X</span>
+      </div>
+    </div>
+    <nav class="tabs" aria-label="Secciones">
+      <a href="#/vivo" data-route="vivo">En vivo</a>
+      <a href="#/laboratorio" data-route="laboratorio">Laboratorio</a>
+      <a href="#/bandeja" data-route="bandeja">Bandeja <span class="count" id="pending-count" hidden>0</span></a>
+      <a href="#/metricas" data-route="metricas">Métricas</a>
+    </nav>
+    <div class="status">
+      <span class="pill" id="mode-pill" title="Motor de decisión">…</span>
+      <span class="pill" id="conn-pill" title="Conexión en vivo"><span class="dot"></span><span>Conectando</span></span>
+      <button class="icon-btn" id="theme-btn" type="button" aria-label="Cambiar tema" title="Cambiar tema"></button>
+    </div>
+  </header>
+  <div class="sim-banner" id="sim-banner" hidden>
+    <strong>Modo simulado.</strong>
+    Las respuestas de JEV las produce un simulador local que imita el formato de TypeSafe. Con <code>TYPESAFE_API_KEY</code> se usa JEV real.
+    <span id="clock-note"></span>
+  </div>
+  <main id="view" tabindex="-1"></main>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-backdrop" data-close></div>
+    <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <button class="icon-btn drawer-close" type="button" data-close aria-label="Cerrar">✕</button>
+      <div id="drawer-body"></div>
+    </div>
+  </aside>
+  <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

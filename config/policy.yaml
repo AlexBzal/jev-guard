@@ -1,0 +1,123 @@
+# Política de JEV Guard.
+# Todo lo que cambia el comportamiento del guardián vive aquí, no en el código.
+# Los valores son un punto de partida conservador; se ajustan con scripts/calibrate.py
+# usando las etiquetas que dejan los revisores humanos.
+
+timezone: America/Bogota
+
+# Umbrales por nivel de impacto (tier). Cuanto más grande el impacto, más bajo el
+# umbral para frenar o retener, y más certeza se exige para actuar solo.
+#   block:         riesgo compuesto a partir del cual se frena la acción
+#   review:        riesgo compuesto a partir del cual se retiene / escala
+#   min_certainty: certeza mínima de una señal para confiar en ella
+#   on_uncertain:  qué hacer si una señal importante es dudosa: llm | human
+#   on_jev_error:  qué hacer si JEV no responde a tiempo: allow | hold
+tiers:
+  low:
+    block: 0.85
+    review: 0.55
+    min_certainty: 0.40
+    on_uncertain: llm
+    on_jev_error: allow
+  medium:
+    block: 0.80
+    review: 0.45
+    min_certainty: 0.50
+    on_uncertain: llm
+    on_jev_error: hold
+  high:
+    block: 0.75
+    review: 0.35
+    min_certainty: 0.60
+    on_uncertain: human
+    on_jev_error: hold
+  critical:
+    block: 0.70
+    review: 0.25
+    min_certainty: 0.70
+    on_uncertain: human
+    on_jev_error: hold
+
+# Riesgo por debajo de este piso se considera ruido y no suma al riesgo compuesto.
+risk_floor: 0.20
+
+# Señales críticas: si JEV las detecta con esta probabilidad, se frena sin importar el tier.
+critical_block: 0.70
+
+# Una señal con al menos este peso frena por sí sola si su riesgo supera el umbral de
+# bloqueo del tier con la certeza mínima del tier.
+strong_signal_weight: 0.80
+
+# Una señal se considera "dudosa" si su certeza es baja y su riesgo cae en esta banda.
+uncertain_band: [0.30, 0.70]
+# Solo cuentan como dudosas las señales con al menos este peso.
+uncertain_min_weight: 0.5
+
+jev:
+  model: jev-latest
+  timeout_s: 1.5
+  price_per_million_input: 0.042   # USD, la salida es gratis
+  max_context_tokens: 32000
+
+llm:
+  enabled: true                    # solo se usa si hay ANTHROPIC_API_KEY o un perfil de `ant auth login`
+  model: claude-opus-5-5
+  effort: medium
+  timeout_s: 20
+  # Referencia para comparar costos contra "LLM como juez" en todas las acciones.
+  price_per_million_input: 4.0
+  price_per_million_output: 20.0
+  est_output_tokens: 200
+
+# Límites de reglas deterministas.
+limits:
+  email_send_max_recipients: 50     # más de esto en un envío individual es un masivo disfrazado
+  frequency_cap_7d: 3               # correos por persona en 7 días
+  frequency_cap_share_bulk: 0.10    # fracción de la lista sobre el tope que obliga a revisar
+  audience_overshoot_review: 1.5    # destinatarios / tamaño esperado
+  audience_overshoot_block: 3.0
+  bulk_two_keys_from: 5000          # desde aquí un masivo siempre requiere segunda llave humana
+  quiet_hours: [20, 8]              # no se envían masivos entre las 20:00 y las 08:00
+  crm_review_records: 2000
+  crm_delete_review_records: 100
+  deal_amount_change_review: 0.5    # variación relativa del monto
+  hashtags_max: 5
+
+# Campos del CRM que nunca deben cambiar sin una persona.
+protected_crm_fields:
+  - consent_marketing
+  - email
+  - deal_amount
+  - owner_id
+  - legal_name
+  - tax_id
+
+platform_max_chars:
+  linkedin: 3000
+  x: 280
+  instagram: 2200
+  youtube: 5000
+  blog: 50000
+
+# Mínimo privilegio: qué puede hacer cada agente y hasta qué tier.
+agents:
+  agente-seguimiento:
+    description: Hace seguimiento comercial a leads inscritos en eventos
+    allowed: [email.send, crm.update]
+    max_tier: medium
+  agente-campanas:
+    description: Envía campañas e invitaciones a segmentos
+    allowed: [email.bulk, email.send]
+    max_tier: critical
+  agente-crm:
+    description: Mantiene limpio y actualizado el CRM
+    allowed: [crm.update, crm.delete]
+    max_tier: high
+  agente-contenido:
+    description: Publica piezas aprobadas en redes y blog
+    allowed: [content.publish]
+    max_tier: high
+  agente-programas:
+    description: Se comunica con alumnos de los programas
+    allowed: [email.send, email.bulk]
+    max_tier: high
