@@ -1,4 +1,4 @@
-"""Generador de tráfico para la demo: los agentes de 30X trabajando dentro del servidor.
+"""Generador de tráfico para la demo: los agentes de la empresa trabajando dentro del servidor.
 
 Usa los casos de data/scenarios*.yaml como plantillas. Los seguros pesan más, como en
 la operación real. Cada decisión queda etiquetada con la verdad de la plantilla
@@ -18,14 +18,15 @@ from typing import Any
 
 import yaml
 
-from .config import ROOT
+from .config import scenario_files
 
 log = logging.getLogger(__name__)
 
 
-def load_scenarios(data_dir: Path = ROOT / "data") -> list[dict[str, Any]]:
+def load_scenarios(profile: str | None = None, files: list[Path] | None = None) -> list[dict[str, Any]]:
+    """Casos etiquetados del perfil (profiles/<perfil>/scenarios*.yaml)."""
     out: list[dict[str, Any]] = []
-    for path in sorted(data_dir.glob("scenarios*.yaml")):
+    for path in files if files is not None else scenario_files(profile):
         out += yaml.safe_load(path.read_text(encoding="utf-8")) or []
     return out
 

@@ -3,7 +3,7 @@
     uvicorn guard.api:app                       # en otra terminal
     python scripts/simulate_agents.py --rate 5 --count 300 --auto-review
 
-Toma los casos de data/scenarios*.yaml como plantillas (los seguros pesan más, como
+Toma los casos del perfil (profiles/<perfil>/scenarios*.yaml) como plantillas (los seguros pesan más, como
 en la operación real) y los envía a POST /v1/guard/check.
 
 --auto-review imita al equipo humano: resuelve las retenidas con la etiqueta de la
@@ -13,6 +13,7 @@ Así se llenan las métricas de calidad del tablero.
 from __future__ import annotations
 
 import argparse
+import os
 import random
 import sys
 import threading
@@ -29,7 +30,7 @@ REVIEWERS = ["ops-ana", "ops-luis", "ops-marta"]
 
 def load_templates() -> list[dict]:
     out = []
-    for path in sorted((ROOT / "data").glob("scenarios*.yaml")):
+    for path in sorted((ROOT / "profiles" / os.environ.get("JEV_GUARD_PROFILE", "demo")).glob("scenarios*.yaml")):
         out += yaml.safe_load(path.read_text(encoding="utf-8"))
     return out
 

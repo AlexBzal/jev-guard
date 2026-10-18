@@ -29,12 +29,13 @@ from .models import (
     RuleHit,
     Severity,
     SignalReading,
+    BUILTIN_ACTION_TYPES,
     Verdict,
     parse_action,
 )
 from .events import EventBus
 from .policy import Intent, PolicyEngine, PolicyOutcome, read_signals, rule_reasons
-from .questions import questions_payload, signals_for
+from .questions import QuestionCatalog, questions_payload
 from .store import DecisionStore
 
 log = logging.getLogger(__name__)
@@ -60,9 +61,15 @@ def _int(n: int) -> str:
     return f"{n:,}".replace(",", ".")
 
 
-def describe(action) -> str:
+def describe(action, policy=None) -> str:
     """Una línea que una persona entiende sin abrir el JSON."""
     t = action.action_type
+    if t not in BUILTIN_ACTION_TYPES:
+        spec = policy.custom_actions.get(t) if policy else None
+        label = spec.label if spec else t
+        field = spec.summary_field if spec else None
+        detail = action.content.get(field) if field else None
+        return f"{label}: «{_short(str(detail), 70)}»" if detail else label
     if t == "email.send":
         who = "1 persona" if len(action.to) == 1 else f"{_int(len(action.to))} personas"
         return f"Correo a {who}: «{_short(action.subject, 70)}»"
@@ -89,6 +96,7 @@ class GuardService:
         self.context = context or default_context()
         self.facts = FactEngine(self.policy, self.context)
         self.engine = PolicyEngine(self.policy)
+        self.catalog = QuestionCatalog(self.policy, self.context)
         self.backend = backend or make_backend(self.policy.jev.model, self.policy.jev.timeout_s)
         self.store = store or DecisionStore()
         if second_opinion is None:
@@ -115,7 +123,7 @@ class GuardService:
         outcome = self.engine.rules_only(facts)
 
         if outcome is None:
-            signals = signals_for(action.action_type, facts.values)
+            signals = self.catalog.signals_for(action.action_type, facts.values)
             state = {"task": action.task, "action": action_view(action), "facts": facts.values,
                      "context": self.context.for_jev()}
             questions = questions_payload(signals)
@@ -134,7 +142,7 @@ class GuardService:
 
         decision = self._finalize(action, facts, outcome, readings, jev_result)
         decision.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
-        decision.summary = describe(action)
+        decision.summary = describe(action, self.policy)
         decision.sandbox = not persist
         if persist:
             self.store.save(decision, action.model_dump(mode="json"))
@@ -148,7 +156,8 @@ class GuardService:
     @property
     def mode(self) -> dict[str, Any]:
         return {"jev": "simulated" if self.backend.simulated else "typesafe",
-                "llm": self.policy.llm.model if self.llm else None}
+                "llm": self.policy.llm.model if self.llm else None,
+                "profile": self.policy.profile, "company": self.context.company.name}
 
     # -- internos ------------------------------------------------------------
 

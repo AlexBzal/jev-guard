@@ -1,7 +1,7 @@
 [project]
 name = "jev-guard"
 version = "0.1.0"
-description = "Guardián en tiempo real para agentes internos de 30X, construido sobre JEV (TypeSafe AI)"
+description = "Guardián abierto y configurable para los agentes de IA de cualquier empresa, construido sobre JEV (TypeSafe AI)"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.110",

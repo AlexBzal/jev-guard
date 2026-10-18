@@ -4,7 +4,10 @@ import httpx
 import pytest
 
 from guard.jev import JevError, SimulatedJev, TypeSafeJev, choice_confidence, score_confidence
-from guard.questions import QUESTION_SETS, questions_payload
+from guard.config import load_context, load_policy
+from guard.questions import QuestionCatalog, questions_payload
+
+QUESTION_SETS = QuestionCatalog(load_policy(profile="demo"), load_context(profile="demo")).sets
 
 # Respuesta de ejemplo tomada de la guía de inicio rápido de TypeSafe.
 DOC_RESPONSE = {

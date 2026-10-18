@@ -1,4 +1,6 @@
-// Formatos y etiquetas en español.
+// Formatos y etiquetas en español. Los nombres propios de cada empresa salen del perfil activo.
+
+import { store } from "./state.js";
 
 const ESC = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ESC[c]);
@@ -51,7 +53,7 @@ export const TIER = {
   critical: "Impacto crítico",
 };
 
-export const ACTION_TYPE = {
+const BUILTIN_TYPES = {
   "email.send": "Correo",
   "email.bulk": "Campaña",
   "crm.update": "Cambio en CRM",
@@ -59,15 +61,18 @@ export const ACTION_TYPE = {
   "content.publish": "Publicación",
 };
 
-export const AGENT = {
-  "agente-seguimiento": "Agente de seguimiento",
-  "agente-campanas": "Agente de campañas",
-  "agente-crm": "Agente de CRM",
-  "agente-contenido": "Agente de contenido",
-  "agente-programas": "Agente de programas",
-};
+/** Tipos de acción del perfil activo: los estándar más los propios de la empresa. */
+export function actionTypes() {
+  const types = store.profile?.action_types || Object.keys(BUILTIN_TYPES);
+  return Object.fromEntries(types.map((t) => [t, actionTypeLabel(t)]));
+}
 
-export const agentName = (id) => AGENT[id] || id;
+export function actionTypeLabel(t) {
+  return BUILTIN_TYPES[t] || store.profile?.custom_actions?.[t]?.label || t;
+}
+
+export const agentName = (id) => store.profile?.agents?.[id]?.name || id;
+export const companyName = () => store.profile?.company?.name || "tu empresa";
 
 export const SEVERITY = { block: "Frena", review: "Revisión", info: "Aviso" };
 

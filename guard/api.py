@@ -15,15 +15,16 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import Body, FastAPI, HTTPException, Query, Request
+import secrets
+
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, ValidationError
 
 from .config import ROOT
 from .demo import TrafficGenerator, load_scenarios
-from .models import ACTION_TYPES, Decision, LabelInput, ReviewInput
-from .questions import QUESTION_SETS
+from .models import Decision, LabelInput, ReviewInput
 from .service import GuardService
 from .store import DecisionStore
 
@@ -35,7 +36,7 @@ EXAMPLE_ACTION = {
     "task": "Haz seguimiento a Andrea, que asistió al meetup de IA en finanzas, y propón una conversación de 20 minutos",
     "to": ["andrea.lopez@fintech-demo.example"],
     "subject": "Gracias por venir al meetup de IA en finanzas",
-    "body": "Hola Andrea, gracias por asistir al meetup. Si te interesa, agendemos 20 minutos para ver cómo tu equipo puede aplicar IA. Un abrazo, equipo 30X",
+    "body": "Hola Andrea, gracias por asistir al meetup. Si te interesa, agendemos 20 minutos para ver cómo tu equipo puede aplicar IA. Un abrazo, el equipo",
     "purpose": "follow_up",
 }
 
@@ -54,7 +55,7 @@ def create_app(service: GuardService | None = None) -> FastAPI:
         db = os.environ.get("JEV_GUARD_DB", str(ROOT / "data" / "runtime" / "guard.db"))
         service = GuardService(store=DecisionStore(db))
 
-    scenarios = load_scenarios()
+    scenarios = load_scenarios(service.policy.profile) if service.policy.profile else []
     traffic = TrafficGenerator(service, scenarios)
 
     @asynccontextmanager
@@ -66,12 +67,23 @@ def create_app(service: GuardService | None = None) -> FastAPI:
         lifespan=lifespan,
         title="JEV Guard",
         version="0.2.0",
-        description="Guardián en tiempo real para agentes internos de 30X, construido sobre JEV (TypeSafe AI).",
+        description="Guardián abierto y configurable para los agentes de IA de cualquier empresa, construido sobre JEV (TypeSafe AI).",
     )
     app.state.guard = service
     app.state.traffic = traffic
     app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("JEV_GUARD_CORS", "*").split(","),
                        allow_methods=["*"], allow_headers=["*"])
+
+    # Clave opcional para los agentes: con JEV_GUARD_API_KEY, POST /v1/guard/check exige
+    # "Authorization: Bearer <clave>". Las pruebas del Laboratorio (sandbox) no la necesitan.
+    api_key = os.environ.get("JEV_GUARD_API_KEY", "")
+
+    def require_agent_key(sandbox: bool = Query(False), authorization: str | None = Header(None)) -> None:
+        if not api_key or sandbox:
+            return
+        token = (authorization or "").removeprefix("Bearer ").strip()
+        if not secrets.compare_digest(token, api_key):
+            raise HTTPException(status_code=401, detail="Falta o es inválida la clave del agente (Authorization: Bearer ...)")
 
     # -- sistema ---------------------------------------------------------------
 
@@ -82,10 +94,21 @@ def create_app(service: GuardService | None = None) -> FastAPI:
 
     @app.get("/v1/policy", tags=["sistema"], summary="Política activa y catálogo de preguntas a JEV")
     def policy():
+        return {"policy": service.policy.model_dump(mode="json"), "questions": service.catalog.describe()}
+
+    @app.get("/v1/profile", tags=["sistema"], summary="Empresa activa: agentes, propósitos y acciones propias")
+    def profile():
+        ctx, pol = service.context, service.policy
         return {
-            "policy": service.policy.model_dump(mode="json"),
-            "questions": {t: [{"qid": s.qid, "label": s.label, "short": s.short, "weight": s.weight, "critical": s.critical,
-                               "question": s.question} for s in QUESTION_SETS[t]] for t in ACTION_TYPES},
+            "profile": pol.profile,
+            "company": ctx.company.model_dump(),
+            "agents": {k: a.model_dump(mode="json") for k, a in pol.agents.items()},
+            "action_types": pol.action_types,
+            "email_purposes": {k: p.model_dump() for k, p in ctx.email_purposes.items()},
+            "custom_actions": {k: a.model_dump(mode="json", include={"label", "description", "fields", "summary_field"})
+                               for k, a in pol.custom_actions.items()},
+            "confidential_example": ctx.confidential_entities[0] if ctx.confidential_entities else None,
+            "auth_required": bool(api_key),
         }
 
     @app.get("/v1/scenarios", tags=["sistema"], summary="Casos preparados (datos simulados)")
@@ -97,7 +120,8 @@ def create_app(service: GuardService | None = None) -> FastAPI:
     # -- guardián ----------------------------------------------------------------
 
     @app.post("/v1/guard/check", response_model=Decision, tags=["guardián"],
-              summary="Evalúa una acción antes de que el agente la ejecute")
+              summary="Evalúa una acción antes de que el agente la ejecute",
+              dependencies=[Depends(require_agent_key)])
     def check(action: dict[str, Any] = Body(..., examples=[EXAMPLE_ACTION]),
               sandbox: bool = Query(False, description="Prueba: no se guarda ni cuenta en métricas")) -> Decision:
         try:

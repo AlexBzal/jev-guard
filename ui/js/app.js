@@ -134,14 +134,17 @@ async function boot() {
   initTooltip();
   initDrawer();
   try {
-    const [health, policy, scenarios] = await Promise.all([api.health(), api.policy(), api.scenarios()]);
+    const [health, policy, scenarios, profile] = await Promise.all([api.health(), api.policy(), api.scenarios(), api.profile()]);
     store.health = health;
     store.policy = policy;
     store.scenarios = scenarios;
+    store.profile = profile;
+    document.getElementById("brand-sub").textContent = `Guardián de agentes de IA · ${profile.company.name}`;
+    document.title = `JEV Guard · ${profile.company.name}`;
     const simulated = health.jev === "simulated";
     const mode = document.getElementById("mode-pill");
     mode.textContent = simulated ? "JEV simulado" : "JEV · TypeSafe";
-    mode.title = health.llm ? `Segunda opinión: ${health.llm}` : "Sin LLM: las dudas van a personas";
+    mode.title = `Perfil: ${profile.profile}. ${health.llm ? `Segunda opinión: ${health.llm}` : "Sin LLM: las dudas van a personas"}`;
     document.getElementById("sim-banner").hidden = !simulated;
     if (health.clock) {
       const when = new Date(health.clock).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" });

@@ -13,15 +13,13 @@ import sys
 import time
 from pathlib import Path
 
-import yaml
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from guard.demo import load_scenarios  # noqa: E402
 from guard.jev import SimulatedJev  # noqa: E402
 from guard.service import GuardService  # noqa: E402
 from guard.store import DecisionStore  # noqa: E402
 
-ROOT = Path(__file__).resolve().parent.parent
 
 
 def main() -> None:
@@ -31,7 +29,7 @@ def main() -> None:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    scenarios = yaml.safe_load((ROOT / "data" / "scenarios.yaml").read_text(encoding="utf-8"))
+    scenarios = load_scenarios()
     svc = GuardService(backend=SimulatedJev(sleep=False), store=DecisionStore(), second_opinion=False)
     lat = []
     t0 = time.perf_counter()

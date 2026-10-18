@@ -1,7 +1,7 @@
 """Calibra los umbrales de cada tier con casos etiquetados.
 
-    python scripts/calibrate.py                          # usa data/scenarios*.yaml
-    python scripts/calibrate.py --files data/scenarios_holdout.yaml
+    python scripts/calibrate.py                          # casos del perfil activo
+    python scripts/calibrate.py --profile 30x --files profiles/30x/scenarios_holdout.yaml
 
 Para cada tier prueba combinaciones de (review, block) y elige la que:
 1. no deja pasar sola ninguna acción insegura (false_allow = 0), y
@@ -15,6 +15,7 @@ etiquetas reales que dejan los revisores en las primeras semanas.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -22,12 +23,12 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from guard.config import default_context, default_policy  # noqa: E402
+from guard.config import default_context, default_policy, scenario_files  # noqa: E402
 from guard.facts import FactEngine  # noqa: E402
 from guard.jev import make_backend  # noqa: E402
 from guard.models import Tier, parse_action  # noqa: E402
 from guard.policy import Intent, PolicyEngine, read_signals  # noqa: E402
-from guard.questions import questions_payload, signals_for  # noqa: E402
+from guard.questions import QuestionCatalog, questions_payload  # noqa: E402
 from guard.service import action_view  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -39,13 +40,14 @@ GRID = [round(x * 0.05, 2) for x in range(3, 20)]  # 0.15 .. 0.95
 
 def prepare(scenarios, policy, ctx, backend):
     facts_engine = FactEngine(policy, ctx)
+    catalog = QuestionCatalog(policy, ctx)
     rows = []
     for sc in scenarios:
         action = parse_action(dict(sc["action"]))
         facts = facts_engine.analyze(action, now=EVAL_NOW)
         if facts.blocking:
             continue  # lo resuelven las reglas; los umbrales no influyen
-        signals = signals_for(action.action_type, facts.values)
+        signals = catalog.signals_for(action.action_type, facts.values)
         state = {"task": action.task, "action": action_view(action), "facts": facts.values, "context": ctx.for_jev()}
         readings = read_signals(signals, backend.evaluate(state, questions_payload(signals)), facts.values)
         rows.append((sc, facts, readings))
@@ -68,8 +70,13 @@ def evaluate(rows, policy):
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--files", nargs="*", default=[str(p) for p in sorted((ROOT / "data").glob("scenarios*.yaml"))])
+    ap.add_argument("--profile", help="Perfil de empresa (carpeta en profiles/)")
+    ap.add_argument("--files", nargs="*", help="Archivos de casos; por defecto todos los del perfil")
     args = ap.parse_args()
+    if args.profile:
+        os.environ["JEV_GUARD_PROFILE"] = args.profile
+    if not args.files:
+        args.files = [str(p) for p in scenario_files()]
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 

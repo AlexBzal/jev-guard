@@ -116,6 +116,48 @@ HTML, CSS y módulos de JavaScript, servidos en `/` por la misma API. Diseño se
 - La página carga en unos 650 ms.
 - 56 pruebas automatizadas pasan.
 
+## 2026-10-18: despliegue en Render y versión abierta para cualquier empresa
+
+### Preparación del despliegue
+
+- `render.yaml` para el plan gratis de Render, con el modo demo y la base en `/tmp` porque el disco no persiste.
+- Los agentes simulados se apagan solos a los 10 minutos, para que un visitante del enlace público no los deje encendidos. La interfaz refleja el apagado.
+- Se probó en local el mismo comando de arranque que usa Render.
+
+### De caso 30X a producto abierto
+
+Se separó el núcleo genérico de la configuración de cada empresa:
+
+- **Perfiles.** `config/defaults.yaml` guarda el motor y `profiles/<empresa>/` guarda el negocio: política, contexto y casos. El perfil se elige con `JEV_GUARD_PROFILE`. 30X queda como un perfil de ejemplo, y `demo` (Nimbus, una empresa de software ficticia) es el perfil por defecto y la plantilla.
+- **Preguntas sin nombres propios.** Ahora citan `context.company`, `context.brand` y `context.policies`. La pregunta de propósito del correo se arma con los propósitos del perfil.
+- **Propósitos configurables.** Cada propósito declara si es de marketing, lo que exige opción de baja, y si puede enviarse fuera de horario. Un propósito no registrado se frena (E012).
+- **Acciones propias sin código.** Se declaran en `custom_actions` con sus campos, su alcance, su reversibilidad, preguntas comunes reutilizadas y preguntas nuevas en YAML, validadas al arrancar. Pasan por las reglas de texto y por el mismo motor. Un tipo no declarado se frena (G005). Nimbus trae la respuesta de soporte como ejemplo.
+- **Preguntas extra** para las acciones estándar, vía `extra_questions`.
+- **Clave opcional para agentes** con `JEV_GUARD_API_KEY`.
+- **Interfaz** con el nombre de la empresa, los agentes, los propósitos y las acciones propias leídos del perfil, a través de `GET /v1/profile`.
+- **Guía de adopción** en [PERFILES.md](PERFILES.md). Sus ejemplos YAML se validan en una prueba automática.
+
+### Evaluación del perfil genérico
+
+Un agente aparte escribió 44 casos para Nimbus, con 16 seguros y 28 inseguros, sin ver el código del guardián. Incluyen 8 respuestas de soporte.
+
+| Medida | Primera corrida, sin ver los casos | Tras quitar lo fijo de 30X del simulador |
+|---|---|---|
+| Coinciden con lo esperado | 34 de 44 | 37 de 44 |
+| Inseguras que pasaron solas | 1 | 1 |
+| Seguras frenadas por error | 2 de 16 | 0 |
+
+La primera columna es la medida honesta. La segunda ya no es independiente. Lo que se corrigió fue una falla de generalización real: el simulador tenía fijos el código de descuento de 30X (EARLY10), el vocabulario editorial sobre IA y los propósitos de correo de 30X. Ahora los lee del perfil: catálogo, línea editorial y descripciones de propósitos. También se ajustó una heurística de alcance que leía "del contacto" como un solo registro aunque fueran duplicados.
+
+La inyección en una nota del CRM, redactada con frases que el vocabulario del simulador no conoce, sigue pasando sola. No se parcheó, por la misma razón que en el perfil 30X: es lo que debe resolver JEV real.
+
+Con estos cambios, el perfil 30X sigue en 49 de 49 en desarrollo y mejora de 24 a 27 de 30 en su conjunto independiente, con las mismas 2 paráfrasis sin detectar.
+
+### Errores encontrados
+
+1. **Una edición dejó un salto de línea literal dentro de un texto de JavaScript.** Todos los módulos que importaban ese archivo fallaron, y la interfaz quedó en blanco sin errores visibles en la consola. La comprobación con `node --check` no lo detectó, porque trata el archivo como CommonJS. Se agregó una prueba que importa cada módulo de la interfaz con Node.
+2. **El ejemplo con `curl` del README fallaba en Windows,** porque `curl` envía los acentos con la codificación local. El ejemplo quedó sin acentos y con una nota.
+
 ### Pendiente
 
-- Correr `scripts/smoke_jev.py` y `scripts/eval.py` con una clave real de TypeSafe. Validar que las instrucciones en español rinden bien y comparar contra el simulador.
+- Correr `scripts/smoke_jev.py` y `scripts/eval.py` con una clave real de TypeSafe. Validar que las instrucciones en español rinden bien, especialmente en las preguntas propias de cada perfil, y comparar contra el simulador.

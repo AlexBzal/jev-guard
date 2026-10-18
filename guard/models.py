@@ -1,8 +1,8 @@
 """Modelos de datos de JEV Guard.
 
-Una *acción* es lo que un agente interno de 30X quiere ejecutar (enviar un correo,
-tocar el CRM, publicar). Una *decisión* es la respuesta del guardián: dejarla pasar,
-frenarla o retenerla para que la revise una persona.
+Una *acción* es lo que un agente interno de una empresa quiere ejecutar (enviar un correo,
+tocar el CRM, publicar, o cualquier acción propia declarada en su perfil). Una *decisión*
+es la respuesta del guardián: dejarla pasar, frenarla o retenerla para que la revise una persona.
 """
 from __future__ import annotations
 
@@ -26,14 +26,6 @@ def utcnow() -> datetime:
 # Acciones que pueden proponer los agentes
 # ---------------------------------------------------------------------------
 
-class EmailPurpose(str, Enum):
-    FOLLOW_UP = "follow_up"          # seguimiento comercial a un lead
-    EVENT_INVITE = "event_invite"    # invitación o recordatorio de evento (Luma)
-    PROGRAM = "program"              # comunicación a alumnos de un programa
-    NEWSLETTER = "newsletter"        # contenido editorial periódico
-    TRANSACTIONAL = "transactional"  # confirmaciones, accesos, facturas
-
-
 class Audience(BaseModel):
     segment_id: str
     description: str = Field(description="Descripción en lenguaje natural del segmento")
@@ -54,7 +46,7 @@ class EmailSendAction(_ActionBase):
     to: list[str] = Field(min_length=1)
     subject: str
     body: str
-    purpose: EmailPurpose
+    purpose: str = Field(description="Uno de los propósitos declarados en el perfil (email_purposes)")
     send_at: datetime | None = None
 
 
@@ -65,7 +57,7 @@ class EmailBulkAction(_ActionBase):
     recipient_count: int | None = Field(default=None, ge=0, description="Total real si `recipients` es una muestra")
     subject: str
     body: str
-    purpose: EmailPurpose
+    purpose: str = Field(description="Uno de los propósitos declarados en el perfil (email_purposes)")
     send_at: datetime | None = None
 
 
@@ -113,17 +105,33 @@ class ContentPublishAction(_ActionBase):
     scheduled_at: datetime | None = None
 
 
-AgentAction = Annotated[
+class CustomAction(_ActionBase):
+    """Acción propia de una empresa, declarada en `custom_actions` de su perfil."""
+
+    action_type: str = Field(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$")
+    content: dict[str, Any] = Field(min_length=1, description="Campos de la acción según su declaración")
+
+
+BuiltinAction = Annotated[
     Union[EmailSendAction, EmailBulkAction, CrmUpdateAction, CrmDeleteAction, ContentPublishAction],
     Field(discriminator="action_type"),
 ]
-ACTION_ADAPTER: TypeAdapter[AgentAction] = TypeAdapter(AgentAction)
+ACTION_ADAPTER: TypeAdapter[BuiltinAction] = TypeAdapter(BuiltinAction)
 
-ACTION_TYPES = ["email.send", "email.bulk", "crm.update", "crm.delete", "content.publish"]
+BUILTIN_ACTION_TYPES = ["email.send", "email.bulk", "crm.update", "crm.delete", "content.publish"]
+
+AgentAction = Union[EmailSendAction, EmailBulkAction, CrmUpdateAction, CrmDeleteAction, ContentPublishAction,
+                    CustomAction]
 
 
 def parse_action(data: dict[str, Any]) -> AgentAction:
-    return ACTION_ADAPTER.validate_python(data)
+    """Valida una acción estándar por su esquema; cualquier otro tipo, como acción personalizada.
+
+    Que el tipo personalizado esté declarado en el perfil lo comprueba el motor de reglas.
+    """
+    if data.get("action_type") in BUILTIN_ACTION_TYPES:
+        return ACTION_ADAPTER.validate_python(data)
+    return CustomAction.model_validate(data)
 
 
 # ---------------------------------------------------------------------------

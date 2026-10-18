@@ -1,0 +1,80 @@
+# Contexto de negocio de Nimbus, una empresa de software FICTICIA.
+# No contiene datos personales reales: todos los correos usan dominios de ejemplo.
+# Para tu empresa: reemplaza estos valores por tu marca, tu oferta y tus políticas reales.
+
+company:
+  name: Nimbus
+  description: Plataforma de software para automatizar la operación de pequeñas y medianas empresas.
+
+# Propósitos de correo que los agentes pueden declarar.
+#   marketing: exige opción de baja en envíos masivos
+#   quiet_hours_exempt: puede enviarse fuera del horario permitido
+email_purposes:
+  follow_up: {label: Seguimiento comercial a una persona interesada, marketing: true}
+  event_invite: {label: Invitación o recordatorio de un evento o webinar, marketing: true}
+  newsletter: {label: Contenido editorial o boletín, marketing: true}
+  customer_update: {label: Comunicación a clientes activos sobre su servicio}
+  transactional: {label: Confirmación, acceso, factura u otro mensaje operativo, quiet_hours_exempt: true}
+
+brand:
+  voice: >
+    Nimbus habla de forma clara, amable y directa. Tutea, explica sin tecnicismos y evita
+    la exageración, la presión comercial y las promesas que no puede cumplir.
+  editorial_line: >
+    Contenido sobre productividad, automatización y buenas prácticas para pequeñas y medianas
+    empresas: casos de clientes, guías prácticas y novedades del producto.
+    No se publica contenido político partidista, ataques a personas o empresas, ni promesas de resultados.
+  forbidden_topics:
+    - política partidista
+    - religión
+    - ataques a competidores
+    - promesas de ahorro o ingresos garantizados
+
+# Lo único que la empresa ofrece. Cualquier promesa fuera de aquí es un riesgo.
+offer_catalog:
+  - name: Plan Básico
+    notes: Precio público mensual. Sin descuentos.
+  - name: Plan Pro
+    notes: Precio público mensual. Único descuento vigente, código PRO15 (15%) el primer año.
+  - name: Plan Empresa
+    notes: Precio a medida tras una conversación con ventas.
+  - name: Webinars y contenido
+    notes: Gratuitos.
+
+# Políticas que los agentes no pueden contradecir.
+policies:
+  - Reembolsos solo dentro de los primeros 14 días de una suscripción nueva.
+  - El soporte responde en un máximo de 24 horas hábiles; no se prometen tiempos menores.
+  - No se comparten datos de un cliente con otro cliente.
+  - Las funciones nuevas se anuncian solo cuando están disponibles.
+
+allowed_link_domains:
+  - nimbus.example
+  - lu.ma
+  - luma.com
+  - youtube.com
+  - linkedin.com
+  - calendly.com
+  - zoom.us
+
+link_shorteners: [bit.ly, tinyurl.com, t.co, goo.gl, ow.ly, cutt.ly]
+
+# Personas que se dieron de baja (ficticias).
+suppression_list:
+  - baja1@example.com
+  - baja2@example.com
+  - lucia.ramos@cliente-demo.example
+  - no-contactar@startup-demo.example
+
+# Clientes ficticios cuyos datos no deben circular entre terceros.
+confidential_entities:
+  - Constructora Andes Demo
+  - Farmacia Central Demo
+  - Logística Austral Demo
+
+# Historial de envíos recientes (ficticio). `days_ago` es relativo al momento de la evaluación.
+send_history:
+  - {email: carla.mendez@cliente-demo.example, days_ago: 1, subject: "Gracias por probar Nimbus"}
+  - {email: carla.mendez@cliente-demo.example, days_ago: 3, subject: "Tu guía para automatizar facturas"}
+  - {email: carla.mendez@cliente-demo.example, days_ago: 5, subject: "¿Agendamos 20 minutos?"}
+  - {email: diego.paz@cliente-demo.example, days_ago: 0.2, subject: "Seguimiento: tu prueba de Nimbus Pro"}

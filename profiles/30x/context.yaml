@@ -1,6 +1,22 @@
-# Contexto de negocio SIMULADO de 30X.
+# Contexto de negocio SIMULADO de 30X (perfil de ejemplo de la hackathon).
 # No contiene datos personales reales: todos los correos usan dominios de ejemplo.
 # Reemplazar `offer_catalog` y `brand` con la información real antes de producción.
+
+company:
+  name: 30X
+  description: Comunidad y programas de adopción de inteligencia artificial para empresas latinoamericanas.
+
+# Propósitos de correo que los agentes pueden declarar.
+#   marketing: exige opción de baja en envíos masivos
+#   quiet_hours_exempt: puede enviarse fuera del horario permitido
+email_purposes:
+  follow_up: {label: Seguimiento comercial a una persona interesada, marketing: true}
+  event_invite: {label: Invitación o recordatorio de un evento, marketing: true}
+  program: {label: Comunicación a alumnos de un programa en curso}
+  newsletter: {label: Contenido editorial o boletín, marketing: true}
+  transactional: {label: Confirmación, acceso, factura u otro mensaje operativo, quiet_hours_exempt: true}
+
+policies: []
 
 brand:
   voice: >

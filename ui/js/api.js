@@ -23,6 +23,7 @@ async function request(method, path, body) {
 export const api = {
   health: () => request("GET", "/health"),
   policy: () => request("GET", "/v1/policy"),
+  profile: () => request("GET", "/v1/profile"),
   scenarios: () => request("GET", "/v1/scenarios"),
   metrics: () => request("GET", "/v1/metrics"),
   decisions: (limit = 40) => request("GET", `/v1/decisions?limit=${limit}`),

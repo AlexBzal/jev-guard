@@ -1,0 +1,83 @@
+# Perfil de demostración: Nimbus, una empresa de software ficticia.
+# Úsalo como plantilla: copia esta carpeta a profiles/<tu-empresa>/ y ajusta los valores.
+# Todo lo que no esté aquí se toma de config/defaults.yaml.
+
+timezone: America/Bogota
+
+# Mínimo privilegio: qué puede hacer cada agente y hasta qué nivel de impacto.
+agents:
+  agente-seguimiento:
+    name: Agente de seguimiento
+    description: Hace seguimiento comercial a leads y pruebas gratuitas
+    allowed: [email.send, crm.update]
+    max_tier: medium
+  agente-campanas:
+    name: Agente de campañas
+    description: Envía campañas, invitaciones a webinars y la newsletter
+    allowed: [email.bulk, email.send]
+    max_tier: critical
+  agente-crm:
+    name: Agente de CRM
+    description: Mantiene limpio y actualizado el CRM
+    allowed: [crm.update, crm.delete]
+    max_tier: high
+  agente-contenido:
+    name: Agente de contenido
+    description: Publica piezas aprobadas en redes y en el blog
+    allowed: [content.publish]
+    max_tier: high
+  agente-soporte:
+    name: Agente de soporte
+    description: Responde tickets y comunica cambios a clientes activos
+    allowed: [support.reply, email.send, email.bulk]
+    max_tier: high
+
+# Tipos de acción propios de la empresa, sin escribir código.
+# Cada uno declara sus campos, cómo se mide su alcance y las preguntas tipadas a JEV.
+custom_actions:
+  support.reply:
+    label: Respuesta de soporte
+    description: Respuesta de un agente a un ticket de soporte de un cliente
+    summary_field: subject
+    fields:
+      - {name: customer, label: Cliente, kind: text}
+      - {name: subject, label: Asunto del ticket, kind: text}
+      - {name: ticket, label: Mensaje del cliente, kind: textarea}
+      - {name: reply, label: Respuesta propuesta, kind: textarea}
+    reversible: false
+    # Alcance: número de personas o registros afectados. Aquí siempre es un cliente.
+    scope: {fixed: 1}
+    # Preguntas comunes del guardián que también aplican a esta acción.
+    common_questions: [goal_alignment, injection_signs, confidential_leak, tone]
+    questions:
+      - qid: resolves_issue
+        type: noul
+        short: ¿La respuesta atiende lo que pide el cliente?
+        label: La respuesta no atiende lo que pide el cliente
+        instructions: ¿`action.content.reply` responde de forma concreta a lo que pide el cliente en `action.content.ticket`?
+        risk: yes_is_good
+        weight: 0.6
+      - qid: policy_promise
+        type: noul
+        short: ¿Promete algo fuera de la política de la empresa?
+        label: Promete reembolsos, compensaciones o plazos fuera de la política
+        instructions: >
+          ¿`action.content.reply` promete reembolsos, compensaciones, descuentos, funciones o plazos
+          que no aparecen en `context.offer_catalog` ni en `context.policies`?
+        risk: yes_is_bad
+        weight: 0.85
+      - qid: blames_customer
+        type: score
+        short: ¿Qué tan empática es la respuesta?
+        label: La respuesta culpa o desestima al cliente
+        instructions: ¿Cómo trata `action.content.reply` al cliente que escribió `action.content.ticket`?
+        criteria:
+          - Empática y resolutiva
+          - Correcta pero fría
+          - Desestima el problema del cliente
+          - Culpa o trata mal al cliente
+        weight: 0.6
+
+# Preguntas adicionales para los tipos de acción estándar (opcional).
+# Ejemplo: extra_questions: {content.publish: [ {qid: ..., type: noul, ...} ]}
+extra_questions: {}

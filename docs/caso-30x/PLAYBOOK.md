@@ -1,4 +1,6 @@
-# Playbook: JEV Guard en 30X
+# Playbook: JEV Guard en 30X (caso de la hackathon)
+
+> Este es el caso de uso original para el reto 30X. JEV Guard es ahora genérico: la configuración de 30X vive en el perfil `profiles/30x/` y se activa con `JEV_GUARD_PROFILE=30x`. Para adoptarlo en otra empresa, ver [la guía de perfiles](../PERFILES.md).
 
 **Área:** Tech, con impacto directo en Comercial y Media.
 **En una frase:** antes de que un agente interno de 30X envíe un correo, toque el CRM o publique algo, JEV decide en milisegundos si la acción es segura; si no está seguro, la pasa a un LLM o a una persona.
@@ -62,7 +64,7 @@ Reglas fijas por encima de los umbrales:
 
 Los veredictos son tres. **allow:** el agente ejecuta. **block:** el agente no ejecuta y recibe las razones. **hold:** la acción espera en la bandeja de revisión. Como JEV no explica, el guardián arma las razones a partir de las señales que se activaron, en lenguaje claro.
 
-Todos los valores viven en `config/policy.yaml` y se ajustan sin tocar código. `scripts/calibrate.py` sugiere umbrales a partir de las etiquetas humanas, con la condición de no dejar pasar ninguna acción insegura.
+Todos los valores viven en `config/defaults.yaml` y `profiles/30x/policy.yaml` y se ajustan sin tocar código. `scripts/calibrate.py` sugiere umbrales a partir de las etiquetas humanas, con la condición de no dejar pasar ninguna acción insegura.
 
 ## 4. Quién lo opera
 
@@ -97,7 +99,7 @@ Todo sale del endpoint `/v1/metrics` y del registro de auditoría en SQLite.
 | Independiente, primera corrida sin ver los casos | 30 | 20 | 4 de 18 | 8 % |
 | Independiente, tras corregir fallas de diseño | 30 | 24 | 2 de 18 | 0 % |
 
-Las 2 inseguras que siguen pasando son paráfrasis que un simulador por palabras clave no detecta: "pagas solo la mitad", y una fuga que describe al cliente sin nombrarlo. Ese es el trabajo de JEV y son los primeros casos que hay que validar con la API real. El detalle está en [BITACORA.md](BITACORA.md).
+Las 2 inseguras que siguen pasando son paráfrasis que un simulador por palabras clave no detecta: "pagas solo la mitad", y una fuga que describe al cliente sin nombrarlo. Ese es el trabajo de JEV y son los primeros casos que hay que validar con la API real. El detalle está en [BITACORA.md](../BITACORA.md).
 
 Costo medido con unos 1.070 tokens por llamada: 0,033 USD por 1.000 decisiones con JEV, frente a unos 6 USD con Claude Opus 5.5 como juez. A 10.000 acciones diarias son unos 0,33 USD al día frente a unos 60 USD.
 
@@ -111,6 +113,6 @@ Costo medido con unos 1.070 tokens por llamada: 0,033 USD por 1.000 decisiones c
 
 - **JEV puede equivocarse con confianza.** Por eso es una capa entre varias: las reglas deterministas cubren lo exacto, los umbrales bajan con el impacto y la auditoría mide los falsos permisos.
 - **No validado aún con JEV real.** El prototipo corre con un simulador si no hay clave de TypeSafe. `scripts/smoke_jev.py` y `scripts/eval.py` corren contra la API real en cuanto exista la clave. Las preguntas están en español y hay que validar ese rendimiento.
-- **El catálogo y la línea editorial son simulados.** Hay que reemplazarlos por los reales de 30X en `data/context.yaml`.
+- **El catálogo y la línea editorial son simulados.** Hay que reemplazarlos por los reales de 30X en `profiles/30x/context.yaml`.
 - **Contexto de 32.000 tokens.** Acciones más grandes pasan a una persona.
 - **Sin datos personales reales.** Todo el prototipo usa datos ficticios.

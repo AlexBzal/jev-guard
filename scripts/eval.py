@@ -1,7 +1,9 @@
-"""Evalúa el guardián contra los casos etiquetados de data/scenarios.yaml.
+"""Evalúa el guardián contra los casos etiquetados de un perfil.
 
-    python scripts/eval.py              # usa JEV real si hay TYPESAFE_API_KEY, si no el simulador
-    python scripts/eval.py --simulate   # fuerza el simulador
+    python scripts/eval.py                          # perfil activo (JEV_GUARD_PROFILE, por defecto demo)
+    python scripts/eval.py --profile 30x            # otro perfil
+    python scripts/eval.py --profile 30x --scenarios profiles/30x/scenarios_holdout.yaml
+    python scripts/eval.py --simulate               # fuerza el simulador aunque haya TYPESAFE_API_KEY
     python scripts/eval.py --json out.json
 
 Sale con código 1 si alguna acción insegura se dejó pasar sola (false_allow > 0).
@@ -10,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +21,7 @@ import yaml
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from guard.config import ROOT  # noqa: E402
+from guard.config import profile_dir  # noqa: E402
 from guard.jev import SimulatedJev  # noqa: E402
 from guard.service import GuardService  # noqa: E402
 from guard.store import DecisionStore  # noqa: E402
@@ -49,20 +52,25 @@ def run(scenarios: list[dict], service: GuardService) -> list[dict]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--scenarios", default=str(ROOT / "data" / "scenarios.yaml"))
+    ap.add_argument("--profile", help="Perfil de empresa (carpeta en profiles/)")
+    ap.add_argument("--scenarios", help="Archivo de casos; por defecto profiles/<perfil>/scenarios.yaml")
     ap.add_argument("--simulate", action="store_true")
     ap.add_argument("--json", help="Guarda resultados y métricas en este archivo")
     ap.add_argument("--quiet", action="store_true")
     args = ap.parse_args()
 
+    if args.profile:
+        os.environ["JEV_GUARD_PROFILE"] = args.profile
+    scenarios_path = Path(args.scenarios) if args.scenarios else profile_dir() / "scenarios.yaml"
     backend = SimulatedJev() if args.simulate else None
     service = GuardService(backend=backend, store=DecisionStore(), second_opinion=None)
-    results = run(load_scenarios(Path(args.scenarios)), service)
+    results = run(load_scenarios(scenarios_path), service)
     metrics = service.metrics()
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
     mode = service.mode
+    print(f"Perfil: {mode['profile']} ({mode['company']})   casos: {scenarios_path.name}")
     print(f"JEV: {mode['jev']}   LLM: {mode['llm'] or 'no configurado (las dudas van a personas)'}")
     print(f"{'caso':28} {'seguro':6} {'esperado':12} {'veredicto':9} {'ruta':6} {'tier':8} {'riesgo':>6}")
     for r in results:

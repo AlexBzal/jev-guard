@@ -6,6 +6,7 @@ export const store = {
   health: null,
   policy: null,
   scenarios: [],
+  profile: null, // empresa activa: agentes, propósitos, acciones propias
   pendingCount: 0,
   labAction: null, // acción que otra vista pide abrir en el Laboratorio
 };

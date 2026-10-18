@@ -1,6 +1,6 @@
 // Componentes reutilizables (devuelven HTML como texto; todo dato pasa por esc()).
 
-import { ACTION_TYPE, ROUTE, SEVERITY, SOURCE, TIER, VERDICT, agentName, dec, esc, ms, pct, usd } from "./format.js";
+import { ROUTE, SEVERITY, SOURCE, TIER, VERDICT, actionTypeLabel, agentName, dec, esc, ms, pct, usd } from "./format.js";
 import { questionFor, tierPolicy } from "./state.js";
 
 const ICONS = {
@@ -29,7 +29,7 @@ export const chip = (text, cls = "", title = "") =>
 export function metaChips(d) {
   return [
     chip(agentName(d.agent_id)),
-    chip(ACTION_TYPE[d.action_type] || d.action_type),
+    chip(actionTypeLabel(d.action_type)),
     chip(TIER[d.tier] || d.tier),
     chip(`Ruta: ${ROUTE[d.route]?.label || d.route}`),
   ].join("");
@@ -108,6 +108,8 @@ export function actionPreview(action) {
   if (t === "email.send" || t === "email.bulk") {
     const to = t === "email.send" ? (action.to || []).join(", ") : `${action.audience?.description || ""} (${action.recipient_count ?? (action.recipients || []).length} personas)`;
     text = `Para: ${to}\nAsunto: ${action.subject}\n\n${action.body}`;
+  } else if (action.content) {
+    text = Object.entries(action.content).map(([k, v]) => `${k}: ${typeof v === "string" ? v : JSON.stringify(v)}`).join("\n\n");
   } else if (t === "content.publish") {
     text = `${action.platform}${action.title ? ` · ${action.title}` : ""}\n\n${action.text}`;
   } else {
@@ -125,7 +127,7 @@ export function decisionDetail(row) {
     ? `<p class="small ink2">Resuelta por ${esc(row.reviewer || "una persona")}: ${verdictBadge(row.final_verdict)}${row.review_note ? ` · «${esc(row.review_note)}»` : ""}</p>` : "";
   const sigs = (d.signals || []).map((s) => signalRow(s, d.action_type)).join("");
   return `
-    <h2 id="drawer-title">${esc(d.summary || ACTION_TYPE[d.action_type])}</h2>
+    <h2 id="drawer-title">${esc(d.summary || actionTypeLabel(d.action_type))}</h2>
     <div class="row">${verdictBadge(d.verdict)}${metaChips(d)}</div>
     ${final}
     <section><h3>Por qué</h3>${reasonsList(d.reasons) || '<p class="ink2 small">Ninguna señal superó los umbrales.</p>'}</section>

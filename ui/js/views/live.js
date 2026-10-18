@@ -2,7 +2,7 @@
 
 import { api } from "../api.js";
 import { decisionDetail, icon, metaChips, openDrawer, topReason, verdictBadge } from "../components.js";
-import { VERDICT, clock, compact, esc, int, ms, pct, usd } from "../format.js";
+import { VERDICT, clock, companyName, compact, esc, int, ms, pct, usd } from "../format.js";
 import { emit, on, store } from "../state.js";
 
 const MAX_ITEMS = 60;
@@ -14,7 +14,7 @@ export function mount(el) {
   el.innerHTML = `
     <div class="page-head">
       <div>
-        <h1>Los agentes de 30X, vigilados en tiempo real</h1>
+        <h1>Los agentes de ${esc(companyName())}, vigilados en tiempo real</h1>
         <p>Cada vez que un agente quiere enviar un correo, tocar el CRM o publicar, JEV Guard decide en milisegundos si puede hacerlo. Lo dudoso pasa a un LLM o a una persona.</p>
       </div>
     </div>

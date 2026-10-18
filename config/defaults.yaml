@@ -1,9 +1,10 @@
-# Política de JEV Guard.
-# Todo lo que cambia el comportamiento del guardián vive aquí, no en el código.
+# Valores por defecto del motor de JEV Guard, comunes a todas las empresas.
+# Cada perfil (profiles/<empresa>/policy.yaml) puede sobrescribir cualquier clave:
+# los diccionarios se combinan y el resto se reemplaza.
 # Los valores son un punto de partida conservador; se ajustan con scripts/calibrate.py
 # usando las etiquetas que dejan los revisores humanos.
 
-timezone: America/Bogota
+timezone: UTC
 
 # Umbrales por nivel de impacto (tier). Cuanto más grande el impacto, más bajo el
 # umbral para frenar o retener, y más certeza se exige para actuar solo.
@@ -99,25 +100,5 @@ platform_max_chars:
   youtube: 5000
   blog: 50000
 
-# Mínimo privilegio: qué puede hacer cada agente y hasta qué tier.
-agents:
-  agente-seguimiento:
-    description: Hace seguimiento comercial a leads inscritos en eventos
-    allowed: [email.send, crm.update]
-    max_tier: medium
-  agente-campanas:
-    description: Envía campañas e invitaciones a segmentos
-    allowed: [email.bulk, email.send]
-    max_tier: critical
-  agente-crm:
-    description: Mantiene limpio y actualizado el CRM
-    allowed: [crm.update, crm.delete]
-    max_tier: high
-  agente-contenido:
-    description: Publica piezas aprobadas en redes y blog
-    allowed: [content.publish]
-    max_tier: high
-  agente-programas:
-    description: Se comunica con alumnos de los programas
-    allowed: [email.send, email.bulk]
-    max_tier: high
+# Los agentes, sus permisos y las acciones personalizadas se definen en cada perfil.
+agents: {}

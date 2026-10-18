@@ -57,10 +57,8 @@ HASHTAG_RE = re.compile(r"#\w+")
 UNSUBSCRIBE_RE = re.compile(r"\{\{\s*unsubscribe_url\s*\}\}|darte de baja|darse de baja|cancelar (?:tu )?suscripci[oó]n|unsubscribe", re.IGNORECASE)
 
 THIRD_PARTY_EMAILS_REVIEW = 3
-# La opción de baja es obligatoria en comunicaciones de marketing, no en avisos operativos.
-MARKETING_PURPOSES = {"follow_up", "event_invite", "newsletter"}
 STAT_CLAIM_RE = re.compile(
-    # "30X" es la marca, así que no se usa el patrón "N x".
+    # No se usa el patrón "N x": chocaría con marcas como "30X".
     r"\d+(?:[.,]\d+)?\s*%|\b(?:multiplica\w*|duplica\w*|triplica\w*)\b|\b\d+\s*veces\b"
     r"|\bpor (?:dos|tres|cuatro|cinco|diez)\b", re.IGNORECASE)
 SOURCE_RE = re.compile(r"\b(?:fuente|seg[uú]n|source|estudio|informe|reporte|encuesta)\b", re.IGNORECASE)
@@ -123,7 +121,7 @@ class FactEngine:
             "crm.update": self._crm_update,
             "crm.delete": self._crm_delete,
             "content.publish": self._publish,
-        }[action.action_type]
+        }.get(action.action_type, self._custom)
         facts = handler(action, now)
         self._agent_permissions(action, facts)
         return facts
@@ -171,6 +169,14 @@ class FactEngine:
                                 message=f"{len(insecure)} enlace(s) sin HTTPS."))
         values.update(link_count=len(links), link_domains=hosts, external_domains=external,
                       char_count=len(text))
+
+    def _purpose(self, key: str, hits: list[RuleHit]):
+        purpose = self.ctx.email_purposes.get(key)
+        if purpose is None:
+            options = ", ".join(self.ctx.email_purposes)
+            hits.append(RuleHit(code="E012", severity=Severity.BLOCK,
+                                message=f"El propósito '{key}' no está registrado en el perfil. Opciones: {options}."))
+        return purpose
 
     def _third_party_contacts(self, body: str, recipients: list[str], hits: list[RuleHit], values: dict) -> None:
         """Un correo que lleva direcciones de otras personas en el cuerpo puede estar filtrando datos."""
@@ -235,7 +241,7 @@ class FactEngine:
 
     def _email_send(self, a: EmailSendAction, now: datetime) -> Facts:
         hits: list[RuleHit] = []
-        values: dict = {"recipient_count": len(a.to), "declared_purpose": a.purpose.value}
+        values: dict = {"recipient_count": len(a.to), "declared_purpose": a.purpose}
         n = len(a.to)
         tier = Tier.LOW if n <= 5 else Tier.MEDIUM if n <= self.policy.limits.email_send_max_recipients else Tier.HIGH
         if n > self.policy.limits.email_send_max_recipients:
@@ -248,7 +254,8 @@ class FactEngine:
         self._third_party_contacts(a.body, a.to, hits, values)
         when = a.send_at or now
         values["local_send_hour"] = self._local_hour(when)
-        if self._in_quiet_hours(when) and a.purpose.value != "transactional":
+        purpose = self._purpose(a.purpose, hits)
+        if self._in_quiet_hours(when) and not (purpose and purpose.quiet_hours_exempt):
             hits.append(RuleHit(code="E007", severity=Severity.REVIEW,
                                 message=f"Se enviaría a las {values['local_send_hour']}:00, fuera del horario permitido."))
         return Facts(tier=tier, blast_radius=n, reversible=False, values=values, hits=hits)
@@ -259,7 +266,7 @@ class FactEngine:
         hits: list[RuleHit] = []
         lim = self.policy.limits
         n = a.recipient_count if a.recipient_count is not None else len(a.recipients)
-        values: dict = {"recipient_count": n, "declared_purpose": a.purpose.value,
+        values: dict = {"recipient_count": n, "declared_purpose": a.purpose,
                         "segment_id": a.audience.segment_id, "expected_size": a.audience.expected_size}
         if n == 0:
             hits.append(RuleHit(code="B004", severity=Severity.BLOCK, message="La campaña no tiene destinatarios."))
@@ -276,7 +283,8 @@ class FactEngine:
             elif ratio >= lim.audience_overshoot_review:
                 hits.append(RuleHit(code="B002", severity=Severity.REVIEW,
                                     message=f"Va a {ratio:.1f} veces más personas que el segmento esperado."))
-        if a.purpose.value in MARKETING_PURPOSES and not UNSUBSCRIBE_RE.search(a.body):
+        purpose = self._purpose(a.purpose, hits)
+        if purpose and purpose.marketing and not UNSUBSCRIBE_RE.search(a.body):
             hits.append(RuleHit(code="B001", severity=Severity.BLOCK,
                                 message="El correo masivo no incluye forma de darse de baja."))
         if not a.subject.strip() or not a.body.strip():
@@ -286,7 +294,7 @@ class FactEngine:
         self._text_checks(f"{a.subject}\n{a.body}", hits, values, merge_tags_ok=True)
         when = a.send_at or now
         values["local_send_hour"] = self._local_hour(when)
-        if self._in_quiet_hours(when) and a.purpose.value != "transactional":
+        if self._in_quiet_hours(when) and not (purpose and purpose.quiet_hours_exempt):
             hits.append(RuleHit(code="E007", severity=Severity.BLOCK,
                                 message=f"Campaña programada a las {values['local_send_hour']}:00, fuera del horario permitido. Reprogramar."))
         return Facts(tier=tier, blast_radius=n, reversible=False, values=values, hits=hits)
@@ -379,3 +387,50 @@ class FactEngine:
                                 message="Publicaría datos de contacto personales (correo o teléfono)."))
         return Facts(tier=Tier.HIGH, blast_radius=1, reversible=False, values=values, hits=hits)
 
+    # -- Acciones personalizadas -------------------------------------------------
+
+    def _custom(self, a, now: datetime) -> Facts:
+        """Acciones declaradas por la empresa en `custom_actions` de su perfil."""
+        spec = self.policy.custom_actions.get(a.action_type)
+        hits: list[RuleHit] = []
+        if spec is None:
+            known = ", ".join(self.policy.action_types)
+            hits.append(RuleHit(code="G005", severity=Severity.BLOCK,
+                                message=f"El tipo de acción '{a.action_type}' no está declarado en el perfil. Tipos válidos: {known}."))
+            return Facts(tier=Tier.HIGH, blast_radius=1, reversible=False, values={}, hits=hits)
+
+        missing = [f.name for f in spec.fields if f.name not in a.content]
+        if missing:
+            hits.append(RuleHit(code="X001", severity=Severity.BLOCK,
+                                message="Faltan campos de la acción: " + ", ".join(missing) + "."))
+        scope = spec.scope.fixed
+        if spec.scope.field is not None:
+            raw = a.content.get(spec.scope.field)
+            try:
+                scope = int(raw)
+            except (TypeError, ValueError):
+                scope = len(raw) if isinstance(raw, (list, tuple)) else 1
+                if not isinstance(raw, (list, tuple)):
+                    hits.append(RuleHit(code="X002", severity=Severity.REVIEW,
+                                        message=f"No se pudo leer el alcance en el campo '{spec.scope.field}'."))
+        limits = spec.tier_by_scope
+        tier = (Tier.LOW if scope <= limits.get("low", 5) else Tier.MEDIUM if scope <= limits.get("medium", 200)
+                else Tier.HIGH if scope <= limits.get("high", 2000) else Tier.CRITICAL)
+        values: dict = {"scope": scope, "action_label": spec.label}
+        text = "\n".join(str(v) for v in _strings(a.content))
+        self._text_checks(text, hits, values, merge_tags_ok=False)
+        pii = INLINE_EMAIL_RE.findall(text)
+        values["emails_in_content"] = len(pii)
+        return Facts(tier=tier, blast_radius=scope, reversible=spec.reversible, values=values, hits=hits)
+
+
+def _strings(obj):
+    """Todos los textos de un contenido anidado."""
+    if isinstance(obj, str):
+        yield obj
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            yield from _strings(v)
+    elif isinstance(obj, (list, tuple)):
+        for v in obj:
+            yield from _strings(v)

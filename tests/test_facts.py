@@ -79,9 +79,9 @@ def test_quiet_hours_use_policy_timezone(engine):
 
 
 def test_frequency_cap_and_duplicates(engine):
-    cap = engine.analyze(parse_action(email(to=["carla.mendez@fintech-demo.example"])), now=NOW)
-    dup = engine.analyze(parse_action(email(to=["diego.paz@agro-demo.example"],
-                                            subject="Seguimiento: conversación sobre el programa")), now=NOW)
+    cap = engine.analyze(parse_action(email(to=["carla.mendez@cliente-demo.example"])), now=NOW)
+    dup = engine.analyze(parse_action(email(to=["diego.paz@cliente-demo.example"],
+                                            subject="Seguimiento: tu prueba de Nimbus Pro")), now=NOW)
     assert "E006" in codes(cap)
     assert "E009" in codes(dup)
 
@@ -136,7 +136,7 @@ def test_third_party_emails_in_body(engine):
 
 
 def test_program_bulk_does_not_need_unsubscribe(engine):
-    facts = engine.analyze(parse_action(bulk(purpose="program", body="Hola {{first_name}}, ya está la guía.")), now=NOW)
+    facts = engine.analyze(parse_action(bulk(purpose="customer_update", body="Hola {{first_name}}, ya está la guía.")), now=NOW)
     assert "B001" not in codes(facts)
 
 

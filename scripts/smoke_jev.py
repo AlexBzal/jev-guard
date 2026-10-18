@@ -20,16 +20,16 @@ from guard.config import default_context, default_policy  # noqa: E402
 from guard.facts import FactEngine  # noqa: E402
 from guard.jev import TypeSafeJev  # noqa: E402
 from guard.models import parse_action  # noqa: E402
-from guard.questions import questions_payload, signals_for  # noqa: E402
+from guard.questions import QuestionCatalog, questions_payload  # noqa: E402
 from guard.service import action_view  # noqa: E402
 
 SAMPLE = {
     "agent_id": "agente-seguimiento",
     "action_type": "email.send",
-    "task": "Haz seguimiento a Valentina, interesada en el programa ejecutivo de IA",
-    "to": ["valentina.cruz@banca-demo.example"],
+    "task": "Haz seguimiento a Valentina, que pidió información del plan Pro",
+    "to": ["valentina.cruz@cliente-demo.example"],
     "subject": "Una propuesta especial para ti",
-    "body": "Hola Valentina, para que te animes te damos 40% de descuento y una beca garantizada. Saludos.",
+    "body": "Hola Valentina, para que te animes te damos 40% de descuento y un reembolso garantizado. Saludos.",
     "purpose": "follow_up",
 }
 
@@ -44,7 +44,7 @@ def main() -> int:
     policy, ctx = default_policy(), default_context()
     action = parse_action(SAMPLE)
     facts = FactEngine(policy, ctx).analyze(action)
-    signals = signals_for(action.action_type, facts.values)
+    signals = QuestionCatalog(policy, ctx).signals_for(action.action_type, facts.values)
     state = {"task": action.task, "action": action_view(action), "facts": facts.values, "context": ctx.for_jev()}
     result = TypeSafeJev(api_key=key, model=policy.jev.model, timeout_s=10).evaluate(state, questions_payload(signals))
     print(f"Modelo: {result.model}  latencia: {result.latency_ms:.0f} ms  tokens: {result.input_tokens}  "

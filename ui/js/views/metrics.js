@@ -2,7 +2,7 @@
 
 import { api } from "../api.js";
 import { columns, hbars, stacked, tableView } from "../charts.js";
-import { ACTION_TYPE, ROUTE, dec, esc, int, ms, pct, usd } from "../format.js";
+import { ROUTE, actionTypeLabel, dec, esc, int, ms, pct, usd } from "../format.js";
 import { on, store } from "../state.js";
 
 const VERDICT_KEYS = [
@@ -46,8 +46,8 @@ export function mount(el) {
       return { label: ROUTE[k].label, value: n, display: `${int(n)} · ${pct(n / m.decisions)}`, tip: `${ROUTE[k].long}: ${int(n)} (${pct(n / m.decisions)})` };
     });
     const bins = (m.latency_hist || []).map((b) => ({ label: binLabel(b), value: b.count, tip: `${binLabel(b)} ms: ${int(b.count)} decisiones` }));
-    const typeRows = Object.keys(ACTION_TYPE).filter((t) => m.by_type_verdict?.[t])
-      .map((t) => ({ label: ACTION_TYPE[t], values: m.by_type_verdict[t] }));
+    const typeRows = Object.keys(m.by_type_verdict || {})
+      .map((t) => ({ label: actionTypeLabel(t), values: m.by_type_verdict[t] }));
 
     const jevPer1000 = m.cost_per_1000_usd;
     const llmPer1000 = m.llm_judge_cost_per_1000_usd;

@@ -1,0 +1,32 @@
+# Perfil de ejemplo: el caso de 30X para el reto de la hackathon.
+# Solo contiene lo propio de la empresa; el resto viene de config/defaults.yaml.
+
+timezone: America/Bogota
+
+# Mínimo privilegio: qué puede hacer cada agente y hasta qué nivel de impacto.
+agents:
+  agente-seguimiento:
+    name: Agente de seguimiento
+    description: Hace seguimiento comercial a leads inscritos en eventos
+    allowed: [email.send, crm.update]
+    max_tier: medium
+  agente-campanas:
+    name: Agente de campañas
+    description: Envía campañas e invitaciones a segmentos
+    allowed: [email.bulk, email.send]
+    max_tier: critical
+  agente-crm:
+    name: Agente de CRM
+    description: Mantiene limpio y actualizado el CRM
+    allowed: [crm.update, crm.delete]
+    max_tier: high
+  agente-contenido:
+    name: Agente de contenido
+    description: Publica piezas aprobadas en redes y blog
+    allowed: [content.publish]
+    max_tier: high
+  agente-programas:
+    name: Agente de programas
+    description: Se comunica con alumnos de los programas
+    allowed: [email.send, email.bulk]
+    max_tier: high

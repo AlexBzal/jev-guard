@@ -1,7 +1,7 @@
 # Arquitectura
 
 ```
- Agente de 30X (Python, n8n, Make, LangChain…)
+ Agente de tu empresa (Python, n8n, Make, LangChain…)
         │  POST /v1/guard/check  {agent_id, action_type, task, …}
         ▼
  ┌──────────────────────────── JEV Guard ─────────────────────────────┐
@@ -24,14 +24,27 @@
                                   etiquetas ► /v1/metrics ► calibrate.py
 ```
 
+## Perfiles: el núcleo es genérico
+
+Nada del motor conoce a una empresa en particular. Todo lo propio vive en `profiles/<empresa>/` y se elige con `JEV_GUARD_PROFILE`:
+
+| Archivo | Contenido |
+|---|---|
+| `config/defaults.yaml` | Valores del motor comunes a todas: umbrales por tier, límites, precios, campos protegidos |
+| `profiles/<empresa>/policy.yaml` | Zona horaria, agentes y permisos, acciones propias, preguntas extra y cualquier ajuste sobre los valores por defecto. Se combina con `defaults.yaml`. |
+| `profiles/<empresa>/context.yaml` | Empresa, propósitos de correo, marca, catálogo, políticas, dominios, listas de baja e historial |
+| `profiles/<empresa>/scenarios*.yaml` | Casos etiquetados para evaluar, calibrar y alimentar la demo |
+
+Las preguntas a JEV citan el contexto del perfil, por ejemplo `context.company` o `context.policies`, en lugar de nombrar a una empresa. Las **acciones propias** se declaran en `custom_actions`: campos, alcance, reversibilidad, preguntas comunes reutilizadas y preguntas nuevas. Pasan por las mismas reglas de texto y por el mismo motor de decisión que las acciones estándar. La guía completa está en [PERFILES.md](PERFILES.md).
+
 ## Módulos
 
 | Archivo | Responsabilidad |
 |---|---|
 | `guard/models.py` | Esquemas de acciones (unión discriminada por `action_type`), hechos, respuestas de JEV y decisiones |
-| `guard/config.py` | Carga `config/policy.yaml` (umbrales, límites, permisos) y `data/context.yaml` (marca, catálogo, listas) |
-| `guard/facts.py` | Reglas deterministas con código (E001…P007), conteos y cálculo del tier |
-| `guard/questions.py` | Catálogo de preguntas a JEV y la función que traduce cada respuesta a riesgo y certeza |
+| `guard/config.py` | Carga y valida el perfil sobre `config/defaults.yaml`, incluidas las acciones y preguntas declaradas en YAML |
+| `guard/facts.py` | Reglas deterministas con código, conteos y cálculo del tier, también para acciones propias |
+| `guard/questions.py` | Preguntas estándar y `QuestionCatalog`, que arma las del perfil y traduce cada respuesta a riesgo y certeza |
 | `guard/jev.py` | Cliente de la API de TypeSafe, simulador heurístico y fórmulas de confianza |
 | `guard/policy.py` | Motor de decisión: riesgo compuesto, señales críticas, dudas y umbrales |
 | `guard/llm.py` | Segunda opinión con Claude, con salida JSON estructurada. Si falla, el caso pasa a una persona. |
@@ -63,7 +76,8 @@ Las preguntas referencian campos del estado con comillas invertidas, por ejemplo
 |---|---|
 | `POST /v1/guard/check` | Evalúa una acción y devuelve el veredicto, las razones, las señales, la latencia y el costo. Con `?sandbox=true` no se guarda ni cuenta en métricas. |
 | `GET /v1/stream` | Flujo en vivo de decisiones y revisiones (Server-Sent Events) |
-| `GET /v1/scenarios` | Casos preparados para el Laboratorio |
+| `GET /v1/scenarios` | Casos preparados del perfil, para el Laboratorio |
+| `GET /v1/profile` | Empresa activa: agentes, propósitos de correo, tipos de acción y acciones propias |
 | `GET` y `POST /v1/demo/traffic` | Estado, arranque y parada de los agentes simulados, solo con `JEV_GUARD_DEMO=1` |
 | `GET /v1/decisions` | Registro de auditoría, con filtros |
 | `GET /v1/decisions/{id}` | Detalle de una decisión, con la acción completa |
@@ -86,7 +100,10 @@ Las preguntas referencian campos del estado con comillas invertidas, por ejemplo
 | `JEV_GUARD_DB` | Ruta de la base SQLite, por defecto `data/runtime/guard.db` |
 | `JEV_GUARD_NOW` | Fija el reloj en ISO 8601, para demos reproducibles |
 | `JEV_GUARD_DEMO=1` | Habilita el borrado del registro |
-| `JEV_GUARD_POLICY`, `JEV_GUARD_CONTEXT` | Rutas alternativas de configuración |
+| `JEV_GUARD_PROFILE` | Perfil de empresa activo, una carpeta de `profiles/`. Por defecto, `demo`. |
+| `JEV_GUARD_API_KEY` | Si se define, `POST /v1/guard/check` exige `Authorization: Bearer <clave>`. Las pruebas del Laboratorio no la necesitan. |
+| `JEV_GUARD_TRAFFIC_MAX_S` | Segundos tras los que se apagan solos los agentes simulados de la demo. Por defecto, 600. |
+| `JEV_GUARD_POLICY`, `JEV_GUARD_CONTEXT` | Rutas alternativas a un archivo de política o de contexto |
 
 ## Reglas deterministas
 
@@ -117,3 +134,7 @@ Las preguntas referencian campos del estado con comillas invertidas, por ejemplo
 | P001, P002 | frena | Límite de caracteres de la plataforma, publicación vacía |
 | P006 | revisión | Datos de contacto personales en una publicación |
 | P007 | revisión | Cifras sin fuente citada |
+| E012 | frena | Propósito de correo no registrado en el perfil |
+| G005 | frena | Tipo de acción no declarado en el perfil |
+| X001 | frena | A una acción propia le faltan campos declarados |
+| X002 | revisión | No se pudo leer el alcance de una acción propia |

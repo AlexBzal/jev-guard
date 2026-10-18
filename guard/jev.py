@@ -172,12 +172,13 @@ PURPOSE_TERMS = {
     "event_invite": ["evento", "meetup", "lu.ma", "luma", "inscribete", "te esperamos", "webinar", "agenda del",
                      "cupos", "asistir", "invitacion"],
     "program": ["modulo", "clase", "entrega", "tarea", "sesion", "alumno", "cohorte", "mentor", "proyecto final"],
+    "customer_update": ["tu cuenta", "tu suscripcion", "tu plan", "mantenimiento", "nueva version", "cambio en el servicio",
+                        "a partir del", "ya esta disponible", "actualizacion"],
     "newsletter": ["edicion", "esta semana", "boletin", "newsletter", "lecturas", "lo que aprendimos", "tendencias"],
     "transactional": ["confirmacion", "tu acceso", "factura", "recibo", "tu inscripcion fue", "credenciales de acceso",
                       "restablecer"],
 }
-AI_TOPIC_TERMS = ["inteligencia artificial", " ia ", " ia.", " ia,", "automatiz", "datos", "modelo", "agentes",
-                  "empresa", "lider", "adopcion", "caso", "aprendizaje", "herramienta", "productividad"]
+GENERIC_TOPIC_TERMS = ["caso", "aprendizaje", "guia", "herramienta", "productividad", "clientes", "equipo"]
 FORBIDDEN_TOPIC_TERMS = ["elecciones", "partido", "candidato", "presidente", "votar", "religion", "dios",
                          "izquierda", "derecha politica"]
 STRONG_CLAIM_TERMS = ["100%", "garantiz", "todos nuestros", "triplica", "duplica tus", "comprobado",
@@ -186,6 +187,12 @@ FALSE_CLAIM_TERMS = ["estafa", "fraude", "mienten", "cura", "ilegal", "roban"]
 NEGATIVE_TERMS = ["estafa", "fraude", "incompetente", "mediocre", "peor", "fracaso", "mienten", "roban",
                   "no sirve", "verguenza"]
 CRISIS_TERMS = ["tragedia", "muertos", "atentado", "masacre", "escandalo"]
+SUPPORT_PROMISE_TERMS = ["reembolso completo", "te devolvemos", "devolucion total", "compensacion", "mes gratis",
+                         "meses gratis", "de descuento", "en menos de una hora", "en una hora", "hoy mismo",
+                         "inmediatamente", "en minutos", "te garantizamos", "sin costo adicional", "funcion nueva ya"]
+BLAME_TERMS = ["es tu culpa", "deberias haber", "no es nuestro problema", "como ya te dijimos", "obviamente",
+               "error tuyo", "no sabes usar", "lee el manual", "otra vez lo mismo"]
+EMPATHY_TERMS = ["lamentamos", "entendemos", "gracias por", "sentimos", "con gusto", "te ayudo", "te ayudamos"]
 
 
 class SimulatedJev:
@@ -287,17 +294,26 @@ class SimulatedJev:
     def _q_unoffered_promise(self, ctx: "_Ctx", q: dict) -> JevAnswer:
         text = ctx.text
         hits = _count(text, PROMISE_TERMS)
+        # Los códigos y porcentajes vigentes salen del catálogo del perfil, no del código.
+        codes, allowed_pcts = _catalog_offers(ctx.state)
+        mentions_code = any(c in text for c in codes)
+        if mentions_code and "de descuento" in text:
+            hits -= 1  # mencionar el descuento vigente no es una promesa indebida
         percents = [int(m) for m in re.findall(r"(\d{1,3})\s*%", text)]
-        allowed_code = "early10" in text
-        hits += sum(1 for pct in percents if not (allowed_code and pct == 10))
-        return self._noul(0.05 + 0.42 * hits, ctx, "promise")
+        hits += sum(1 for pct in percents if not (mentions_code and pct in allowed_pcts))
+        return self._noul(0.05 + 0.42 * max(hits, 0), ctx, "promise")
 
     def _q_pressure_tactics(self, ctx: "_Ctx", q: dict) -> JevAnswer:
         hits = _count(ctx.text, PRESSURE_TERMS) + ctx.raw_text.count("!!!") + _shouting(ctx.raw_text)
         return self._noul(0.05 + 0.33 * hits, ctx, "pressure")
 
     def _q_purpose(self, ctx: "_Ctx", q: dict) -> JevAnswer:
-        scores = {opt: float(_count(ctx.text, PURPOSE_TERMS.get(opt, []))) for opt in q["criteria"]}
+        content = _tokens(ctx.raw_text)
+        scores = {}
+        for opt, label in q["criteria"].items():
+            known = PURPOSE_TERMS.get(opt)
+            # Propósitos propios del perfil: se comparan las palabras de su descripción.
+            scores[opt] = float(_count(ctx.text, known)) if known else 0.5 * len(_tokens(label) & content)
         scores["other"] = 0.4
         return self._choice(scores, temperature=0.7)
 
@@ -345,7 +361,8 @@ class SimulatedJev:
         elif numbers:
             target = max(numbers)
             p = 0.9 if count <= target * 1.2 else 0.12
-        elif re.search(r"\b(este|esta|el|la|del|al)\s+(contacto|lead|negocio|empresa|registro|deal)\b", task):
+        elif (re.search(r"\b(este|esta|el|la|del|al)\s+(contacto|lead|negocio|empresa|registro|deal)\b", task)
+              and not re.search(r"\b(duplicados|registros|contactos|negocios|empresas|leads)\b", task)):
             p = 0.88 if count <= 1 else 0.08
         else:
             p = 0.75 if count <= 50 else 0.3
@@ -374,7 +391,10 @@ class SimulatedJev:
     # -- contenido -----------------------------------------------------------
 
     def _q_editorial_fit(self, ctx: "_Ctx", q: dict) -> JevAnswer:
-        on_topic = _count(ctx.text, AI_TOPIC_TERMS)
+        # Afinidad con la línea editorial del perfil: palabras en común con su descripción.
+        brand = ctx.state.get("context", {}).get("brand", {})
+        line = _tokens(str(brand.get("editorial_line", "")))
+        on_topic = len(line & _tokens(ctx.raw_text)) + _count(ctx.text, GENERIC_TOPIC_TERMS)
         forbidden = _count(ctx.text, FORBIDDEN_TOPIC_TERMS)
         p = 0.3 + 0.17 * min(on_topic, 4) - 0.35 * forbidden
         return self._noul(p, ctx, "edit")
@@ -404,6 +424,39 @@ class SimulatedJev:
         if "polemic" in ctx.text or "opinion impopular" in ctx.text:
             return self._score(1.0, n, 0.6)
         return self._score(0.1, n, 0.5)
+
+    # -- acción personalizada del perfil demo: respuestas de soporte ---------------
+
+    def _q_resolves_issue(self, ctx: "_Ctx", q: dict) -> JevAnswer:
+        content = ctx.action.get("content", {})
+        ticket, reply = _tokens(str(content.get("ticket", ""))), _tokens(str(content.get("reply", "")))
+        if len(str(content.get("reply", "")).strip()) < 40:
+            return self._noul(0.2, ctx, "resolves")
+        overlap = len(ticket & reply) / max(len(ticket), 1)
+        return self._noul(0.45 + 0.5 * min(1.0, overlap * 3), ctx, "resolves")
+
+    def _q_policy_promise(self, ctx: "_Ctx", q: dict) -> JevAnswer:
+        reply = " " + _norm(str(ctx.action.get("content", {}).get("reply", ""))) + " "
+        hits = _count(reply, SUPPORT_PROMISE_TERMS) + len(re.findall(r"(\d{1,3})\s*%", reply))
+        return self._noul(0.05 + 0.42 * hits, ctx, "policy")
+
+    def _q_blames_customer(self, ctx: "_Ctx", q: dict) -> JevAnswer:
+        n = len(q["criteria"])
+        reply = " " + _norm(str(ctx.action.get("content", {}).get("reply", ""))) + " "
+        if _count(reply, BLAME_TERMS) or _count(reply, AGGRESSIVE_TERMS):
+            return self._score(2.8, n, 0.5)
+        if _count(reply, EMPATHY_TERMS):
+            return self._score(0.1, n, 0.5)
+        return self._score(1.0, n, 0.6)
+
+
+def _catalog_offers(state: dict) -> tuple[set[str], set[int]]:
+    """Códigos promocionales (p. ej. PRO15) y porcentajes que aparecen en el catálogo del perfil."""
+    catalog = state.get("context", {}).get("offer_catalog", [])
+    text = " ".join(f"{o.get('name', '')} {o.get('notes', '')}" for o in catalog)
+    codes = {c.lower() for c in re.findall(r"\b[A-Z]{2,}\d{1,3}\b", text)}
+    pcts = {int(p) for p in re.findall(r"(\d{1,3})\s*%", text)}
+    return codes, pcts
 
 
 def _shouting(raw: str) -> int:
