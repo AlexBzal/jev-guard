@@ -5,6 +5,7 @@ async function request(method, path, body) {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
+    keepalive: method !== "GET", // una revisión enviada al cerrar la pestaña no se pierde
   });
   const text = await res.text();
   const data = text ? JSON.parse(text) : null;

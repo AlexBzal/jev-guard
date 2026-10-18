@@ -14,32 +14,45 @@
 </head>
 <body>
   <a class="skip" href="#view">Saltar al contenido</a>
-  <header class="topbar">
-    <div class="brand">
-      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 5 7v8c0 7 4.7 12 11 14 6.3-2 11-7 11-14V7z"/><path class="tick" d="m11 16 4 4 7-8"/></svg>
-      <div>
-        <strong>JEV Guard</strong>
-        <span id="brand-sub">Guardián de agentes de IA</span>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Navegación principal">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 3 5 7v8c0 7 4.7 12 11 14 6.3-2 11-7 11-14V7z"/><path class="tick" d="m11 16 4 4 7-8"/></svg>
+        <div>
+          <strong>JEV Guard</strong>
+          <span id="brand-sub">Guardián de agentes de IA</span>
+        </div>
       </div>
+      <nav class="nav" aria-label="Secciones">
+        <a href="#/vivo" data-route="vivo" data-key="1"><span class="ni" data-icon="pulse"></span><span class="nl">En vivo</span><kbd>1</kbd></a>
+        <a href="#/laboratorio" data-route="laboratorio" data-key="2"><span class="ni" data-icon="flask"></span><span class="nl">Laboratorio</span><kbd>2</kbd></a>
+        <a href="#/bandeja" data-route="bandeja" data-key="3"><span class="ni" data-icon="inbox"></span><span class="nl">Bandeja</span><span class="count" id="pending-count" hidden>0</span><kbd>3</kbd></a>
+        <a href="#/metricas" data-route="metricas" data-key="4"><span class="ni" data-icon="chart"></span><span class="nl">Métricas</span><kbd>4</kbd></a>
+      </nav>
+      <div class="side-foot">
+        <div class="company" id="company-card" hidden>
+          <span class="micro muted">Empresa</span>
+          <strong id="company-name"></strong>
+          <span class="micro muted" id="company-profile"></span>
+        </div>
+        <div class="engine">
+          <span class="pill" id="mode-pill" title="Motor de decisión">…</span>
+          <span class="pill" id="conn-pill" title="Conexión en vivo" aria-live="polite"><span class="dot"></span><span>Conectando</span></span>
+        </div>
+        <div class="side-actions">
+          <button class="icon-btn" id="help-btn" type="button" aria-label="Atajos de teclado" title="Atajos de teclado (?)">?</button>
+          <button class="icon-btn" id="theme-btn" type="button" aria-label="Cambiar tema" title="Cambiar tema"></button>
+        </div>
+      </div>
+    </aside>
+    <div class="main-col">
+      <div class="sim-banner" id="sim-banner" hidden>
+        <span class="sim-dot" aria-hidden="true"></span>
+        <span><strong>Modo simulado.</strong> Las respuestas de JEV las produce un simulador local con el formato de TypeSafe. Con <code>TYPESAFE_API_KEY</code> se usa JEV real.<span id="clock-note"></span></span>
+      </div>
+      <main id="view" tabindex="-1"></main>
     </div>
-    <nav class="tabs" aria-label="Secciones">
-      <a href="#/vivo" data-route="vivo">En vivo</a>
-      <a href="#/laboratorio" data-route="laboratorio">Laboratorio</a>
-      <a href="#/bandeja" data-route="bandeja">Bandeja <span class="count" id="pending-count" hidden>0</span></a>
-      <a href="#/metricas" data-route="metricas">Métricas</a>
-    </nav>
-    <div class="status">
-      <span class="pill" id="mode-pill" title="Motor de decisión">…</span>
-      <span class="pill" id="conn-pill" title="Conexión en vivo"><span class="dot"></span><span>Conectando</span></span>
-      <button class="icon-btn" id="theme-btn" type="button" aria-label="Cambiar tema" title="Cambiar tema"></button>
-    </div>
-  </header>
-  <div class="sim-banner" id="sim-banner" hidden>
-    <strong>Modo simulado.</strong>
-    Las respuestas de JEV las produce un simulador local que imita el formato de TypeSafe. Con <code>TYPESAFE_API_KEY</code> se usa JEV real.
-    <span id="clock-note"></span>
   </div>
-  <main id="view" tabindex="-1"></main>
   <aside class="drawer" id="drawer" aria-hidden="true">
     <div class="drawer-backdrop" data-close></div>
     <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
@@ -47,6 +60,18 @@
       <div id="drawer-body"></div>
     </div>
   </aside>
+  <dialog class="dialog" id="help-dialog" aria-labelledby="help-title">
+    <h2 id="help-title">Atajos de teclado</h2>
+    <dl class="shortcuts">
+      <dt><kbd>1</kbd> a <kbd>4</kbd></dt><dd>Ir a En vivo, Laboratorio, Bandeja o Métricas</dd>
+      <dt><kbd>Espacio</kbd></dt><dd>En vivo: simular o detener a los agentes</dd>
+      <dt><kbd>J</kbd> <kbd>K</kbd></dt><dd>Bandeja: siguiente y anterior</dd>
+      <dt><kbd>A</kbd> <kbd>R</kbd></dt><dd>Bandeja: aprobar o rechazar la seleccionada</dd>
+      <dt><kbd>Esc</kbd></dt><dd>Cerrar el panel o este diálogo</dd>
+      <dt><kbd>?</kbd></dt><dd>Mostrar esta ayuda</dd>
+    </dl>
+    <form method="dialog"><button class="btn" type="submit">Entendido</button></form>
+  </dialog>
   <div class="tooltip" id="tooltip" role="tooltip" hidden></div>
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <script type="module" src="/js/app.js"></script>

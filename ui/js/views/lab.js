@@ -2,8 +2,8 @@
 // Usa el modo de prueba (sandbox): no se guarda ni cuenta en las métricas.
 
 import { api } from "../api.js";
-import { chip, icon, reasonsList, riskMeter, signalRow, verdictBadge } from "../components.js";
-import { ROUTE, SEVERITY, TIER, actionTypes, agentName, esc, int, ms, usd } from "../format.js";
+import { chip, icon, reasonsList, riskMeter, signalRow, skeleton, term, verdictBadge } from "../components.js";
+import { ROUTE, SEVERITY, TIER, actionTypes, agentName, dec, esc, int, ms, usd } from "../format.js";
 import { store } from "../state.js";
 
 const OBJECTS = { contact: "Contacto", deal: "Negocio", company: "Empresa" };
@@ -122,8 +122,9 @@ export function mount(el) {
   el.innerHTML = `
     <div class="page-head">
       <div>
-        <h1>Laboratorio: cómo decide JEV</h1>
-        <p>Elige un caso o edítalo. Cada cambio se evalúa al instante: reglas en código, preguntas tipadas a JEV, umbrales según el impacto y el veredicto. Las pruebas de aquí no cuentan en las métricas.</p>
+        <div class="eyebrow">Laboratorio</div>
+        <h1>Cómo decide el guardián, paso a paso</h1>
+        <p class="lead">Elige una acción y cámbiala. Cada cambio se evalúa al instante y ves por qué se permite, se frena o se retiene. Estas pruebas no cuentan en las métricas.</p>
       </div>
     </div>
     <div class="grid cols-lab">
@@ -136,6 +137,7 @@ export function mount(el) {
         <div class="field">
           <label>¿Qué pasa si…?</label>
           <div class="mutations" id="lab-mutations"></div>
+          <span class="hint">Cada botón cambia la acción como lo haría un agente que se equivoca.</span>
         </div>
         <div id="lab-form"></div>
         <details class="adv"><summary>Editar el JSON completo</summary>
@@ -148,9 +150,9 @@ export function mount(el) {
           <label class="switch"><input type="checkbox" id="lab-auto" checked> Evaluar al escribir</label>
         </div>
       </div>
-      <div>
-        <div class="row" style="margin-bottom:10px;min-height:24px"><span id="lab-status" class="muted small"></span></div>
-        <div class="pipeline" id="lab-result"><div class="card empty">Elige un caso para ver la decisión.</div></div>
+      <div class="lab-side">
+        <div class="row" style="margin-bottom:10px;min-height:24px"><span id="lab-status" class="muted small" aria-live="polite"></span></div>
+        <div class="pipeline" id="lab-result">${skeleton.card(120)}${skeleton.card(220)}</div>
       </div>
     </div>`;
 
@@ -291,6 +293,21 @@ export function mount(el) {
     }
   }
 
+  // Qué pasos dejó abiertos o cerrados la persona; se respeta entre evaluaciones.
+  const openSteps = { rules: false, jev: true, policy: false };
+  el.addEventListener("toggle", (e) => {
+    const k = e.target?.dataset?.step;
+    if (k) openSteps[k] = e.target.open;
+  }, true);
+
+  function step(key, num, title, sub, body, extraCls = "") {
+    return `<details class="card step${extraCls}" data-step="${key}"${openSteps[key] ? " open" : ""}>
+      <summary><span class="num">${num}</span><div><h3>${title}</h3><div class="s">${sub}</div></div>
+        <span class="chev">${icon("chevron")}</span></summary>
+      <div class="step-body">${body}</div></details>`;
+  }
+
+  let lastVerdict = null;
   function renderResult(d) {
     const rules = (d.reasons || []).filter((r) => r.source === "rule");
     const blockedByRules = d.route === "rules";
@@ -307,28 +324,27 @@ export function mount(el) {
     ].filter(Boolean).join("");
 
     const signals = d.signals || [];
+    const flagged = signals.filter((s) => s.risk >= 0.5).length;
     const jevHtml = blockedByRules || !signals.length
       ? `<p class="ink2 small" style="margin:0">No hizo falta llamar a JEV: ${blockedByRules ? "una regla ya resolvió la acción" : "la acción pasó a revisión antes"}. Costo de esta decisión: <b>0 USD</b>.</p>`
       : `<div class="signals">${signals.map((s) => signalRow(s, d.action_type)).join("")}</div>
-         <div class="facts"><span>Preguntas <b>${signals.length}</b> en 1 llamada</span><span>Latencia JEV <b>${ms(d.jev_latency_ms)}</b></span>
+         <div class="facts"><span>Preguntas <b>${signals.length}</b> en 1 llamada</span><span>Latencia <b>${ms(d.jev_latency_ms)}</b></span>
          <span>Tokens <b>${int(d.input_tokens)}</b></span><span>Costo <b>${usd(d.cost_usd)}</b></span><span>Modelo <b>${esc(d.jev_model)}</b></span></div>`;
 
-    const others = reasonsList(d.reasons, { skip: ["rule"] });
+    const changed = lastVerdict && lastVerdict !== d.verdict;
+    lastVerdict = d.verdict;
+    const rulesSub = rules.length ? `${rules.length} comprobación${rules.length === 1 ? "" : "es"} con observaciones` : "Todo en orden";
+    const jevSub = blockedByRules || !signals.length ? "No se consultó" : `${signals.length} preguntas · ${flagged ? `${flagged} con riesgo` : "ninguna con riesgo"}`;
     $("#lab-result").innerHTML = `
-      <div class="card step reveal"><span class="num">1</span>
-        <h3>Reglas en código</h3><p class="step-sub">Lo exacto no se le pregunta a JEV: conteos, listas de baja, horarios, permisos y secretos.</p>
-        ${rulesHtml}<div class="facts">${factBits}</div></div>
-      <div class="card step reveal${blockedByRules ? " skipped" : ""}"><span class="num">2</span>
-        <h3>Preguntas tipadas a JEV</h3><p class="step-sub">Cada pregunta es un juicio simple. La barra muestra el riesgo que se deriva de la respuesta.</p>
-        ${jevHtml}</div>
-      <div class="card step reveal"><span class="num">3</span>
-        <h3>Política según el impacto</h3><p class="step-sub">${esc(TIER[d.tier])}: ${esc(tierWhy(d))}. Cuanto mayor el impacto, más bajos los umbrales.</p>
-        ${riskMeter(d.risk, d.tier)}</div>
-      <div class="card step reveal"><span class="num">4</span>
-        <h3>Veredicto</h3>
-        <div class="verdict-box">${verdictBadge(d.verdict, true)}<span class="ink2">${esc(ROUTE[d.route]?.long || "")}</span></div>
-        ${others ? `<div style="margin-top:12px">${others}</div>` : ""}
-        <div class="facts"><span>Total <b>${ms(d.latency_ms)}</b></span><span>Costo <b>${usd(d.cost_usd)}</b></span></div></div>`;
+      <div class="card verdict-hero${changed ? " flash" : ""}">
+        <div class="vrow">${verdictBadge(d.verdict, true)}<span class="route">${esc(ROUTE[d.route]?.long || "")}</span></div>
+        ${reasonsList(d.reasons) || '<p class="ink2 small" style="margin:0">Ninguna regla ni señal superó los umbrales.</p>'}
+        <div class="stats"><span>${term("Riesgo", "riesgo")} <b>${dec(d.risk)}</b></span><span>${term("Impacto", "impacto")} <b>${esc((TIER[d.tier] || "").replace("Impacto ", ""))}</b></span>
+          <span>Total <b>${ms(d.latency_ms)}</b></span><span>Costo <b>${usd(d.cost_usd)}</b></span></div>
+      </div>
+      ${step("rules", 1, `${term("Reglas", "reglas")} en código`, rulesSub, `${rulesHtml}<div class="facts">${factBits}</div>`)}
+      ${step("jev", 2, `Preguntas tipadas a ${term("JEV", "jev")}`, jevSub, jevHtml, blockedByRules ? " skipped" : "")}
+      ${step("policy", 3, "Umbrales según el impacto", `${esc(TIER[d.tier])}: ${esc(tierWhy(d))}`, riskMeter(d.risk, d.tier))}`;
   }
 
   renderForm();

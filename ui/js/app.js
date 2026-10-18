@@ -1,4 +1,4 @@
-// Arranque de la interfaz: enrutador, conexión en vivo, tema, tooltip y panel lateral.
+// Arranque de la interfaz: enrutador con transiciones, atajos, conexión en vivo, tema, tooltip y panel lateral.
 
 import { api } from "./api.js";
 import { closeDrawer, icon, toast } from "./components.js";
@@ -9,26 +9,40 @@ import * as review from "./views/review.js";
 import * as metrics from "./views/metrics.js";
 
 const VIEWS = { vivo: live, laboratorio: lab, bandeja: review, metricas: metrics };
+const ORDER = ["vivo", "laboratorio", "bandeja", "metricas"];
 const view = document.getElementById("view");
 let unmount = null;
 
-// -- enrutador ------------------------------------------------------------------
+// -- enrutador ----------------------------------------------------------------------
 
-function route() {
+function currentRoute() {
   const name = (location.hash.replace(/^#\//, "") || "vivo").split("?")[0];
-  const mod = VIEWS[name] || live;
-  document.querySelectorAll(".tabs a").forEach((a) => {
+  return VIEWS[name] ? name : "vivo";
+}
+
+function render() {
+  const name = currentRoute();
+  document.querySelectorAll(".nav a").forEach((a) => {
     if (a.dataset.route === name) a.setAttribute("aria-current", "page");
     else a.removeAttribute("aria-current");
   });
   if (unmount) unmount();
   view.innerHTML = "";
-  unmount = mod.mount(view) || null;
+  unmount = VIEWS[name].mount(view) || null;
   view.focus({ preventScroll: true });
   window.scrollTo(0, 0);
 }
 
-// -- tema -------------------------------------------------------------------------
+function route() {
+  // Transición suave entre vistas donde el navegador la soporta.
+  if (document.startViewTransition && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    document.startViewTransition(render);
+  } else {
+    render();
+  }
+}
+
+// -- tema ------------------------------------------------------------------------------
 
 const THEMES = ["auto", "light", "dark"];
 const THEME_LABEL = { auto: "Tema: automático", light: "Tema: claro", dark: "Tema: oscuro" };
@@ -54,40 +68,61 @@ function initTheme() {
   });
 }
 
-// -- tooltip global (cualquier elemento con data-tip) ------------------------------
+// -- tooltip global (data-tip), con ratón y con teclado ------------------------------------
 
 function initTooltip() {
   const tip = document.getElementById("tooltip");
-  document.addEventListener("mousemove", (e) => {
-    const el = e.target.closest?.("[data-tip]");
-    if (!el) { tip.hidden = true; return; }
+  const show = (el, x, y) => {
     tip.textContent = el.getAttribute("data-tip");
     tip.hidden = false;
     const pad = 14;
-    const { innerWidth: W, innerHeight: H } = window;
     const r = tip.getBoundingClientRect();
-    let x = e.clientX + pad;
-    let y = e.clientY + pad;
-    if (x + r.width > W - 8) x = e.clientX - r.width - pad;
-    if (y + r.height > H - 8) y = e.clientY - r.height - pad;
-    tip.style.left = `${x}px`;
-    tip.style.top = `${y}px`;
+    let left = x + pad;
+    let top = y + pad;
+    if (left + r.width > innerWidth - 8) left = x - r.width - pad;
+    if (top + r.height > innerHeight - 8) top = y - r.height - pad;
+    tip.style.left = `${Math.max(8, left)}px`;
+    tip.style.top = `${Math.max(8, top)}px`;
+  };
+  document.addEventListener("mousemove", (e) => {
+    const el = e.target.closest?.("[data-tip]");
+    if (!el || !el.getAttribute("data-tip")) { tip.hidden = true; return; }
+    show(el, e.clientX, e.clientY);
   });
+  document.addEventListener("focusin", (e) => {
+    const el = e.target.closest?.("[data-tip]");
+    if (!el || !el.getAttribute("data-tip")) return;
+    const r = el.getBoundingClientRect();
+    show(el, r.left, r.bottom);
+  });
+  document.addEventListener("focusout", () => { tip.hidden = true; });
   document.addEventListener("scroll", () => { tip.hidden = true; }, true);
 }
 
-// -- panel lateral -------------------------------------------------------------------
+// -- panel lateral, ayuda y atajos -------------------------------------------------------------
 
-function initDrawer() {
+function initOverlays() {
   document.getElementById("drawer").addEventListener("click", (e) => {
     if (e.target.closest("[data-close]")) closeDrawer();
   });
+  const help = document.getElementById("help-dialog");
+  document.getElementById("help-btn").addEventListener("click", () => help.showModal());
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && document.getElementById("drawer").classList.contains("open")) closeDrawer();
+    const typing = e.target.closest?.("input, textarea, select, [contenteditable]");
+    if (e.key === "Escape" && document.getElementById("drawer").classList.contains("open")) { closeDrawer(); return; }
+    if (typing || e.metaKey || e.ctrlKey || e.altKey || help.open) return;
+    if (e.key === "?") { e.preventDefault(); help.showModal(); return; }
+    const idx = ["1", "2", "3", "4"].indexOf(e.key);
+    if (idx >= 0) { e.preventDefault(); location.hash = `#/${ORDER[idx]}`; return; }
+    emit("key", e); // atajos propios de cada vista
   });
 }
 
-// -- conexión en vivo ------------------------------------------------------------------
+function initNavIcons() {
+  document.querySelectorAll(".nav [data-icon]").forEach((el) => { el.innerHTML = icon(el.dataset.icon); });
+}
+
+// -- conexión en vivo ---------------------------------------------------------------------------
 
 function setConn(state) {
   const pill = document.getElementById("conn-pill");
@@ -110,10 +145,7 @@ function initStream() {
     setPending(Math.max(0, store.pendingCount - 1));
     emit("review", JSON.parse(e.data));
   });
-  es.addEventListener("reset", () => {
-    setPending(0);
-    emit("reset");
-  });
+  es.addEventListener("reset", () => { setPending(0); emit("reset"); });
 }
 
 function setPending(n) {
@@ -127,31 +159,32 @@ async function refreshPending() {
   try { setPending((await api.pending()).length); } catch (e) { /* se reintenta en el próximo ciclo */ }
 }
 
-// -- arranque --------------------------------------------------------------------------
+// -- arranque ------------------------------------------------------------------------------------
 
 async function boot() {
   initTheme();
+  initNavIcons();
   initTooltip();
-  initDrawer();
+  initOverlays();
   try {
     const [health, policy, scenarios, profile] = await Promise.all([api.health(), api.policy(), api.scenarios(), api.profile()]);
-    store.health = health;
-    store.policy = policy;
-    store.scenarios = scenarios;
-    store.profile = profile;
-    document.getElementById("brand-sub").textContent = `Guardián de agentes de IA · ${profile.company.name}`;
-    document.title = `JEV Guard · ${profile.company.name}`;
+    Object.assign(store, { health, policy, scenarios, profile });
+    const company = profile.company.name;
+    document.getElementById("company-name").textContent = company;
+    document.getElementById("company-profile").textContent = `Perfil «${profile.profile}» · ${Object.keys(profile.agents).length} agentes`;
+    document.getElementById("company-card").hidden = false;
+    document.title = `JEV Guard · ${company}`;
     const simulated = health.jev === "simulated";
     const mode = document.getElementById("mode-pill");
     mode.textContent = simulated ? "JEV simulado" : "JEV · TypeSafe";
-    mode.title = `Perfil: ${profile.profile}. ${health.llm ? `Segunda opinión: ${health.llm}` : "Sin LLM: las dudas van a personas"}`;
+    mode.title = health.llm ? `Segunda opinión: ${health.llm}` : "Sin LLM: las dudas van a personas";
     document.getElementById("sim-banner").hidden = !simulated;
     if (health.clock) {
       const when = new Date(health.clock).toLocaleString("es-CO", { dateStyle: "medium", timeStyle: "short" });
       document.getElementById("clock-note").textContent = ` Reloj de la demo fijado en ${when.replace(/\.$/, "")}.`;
     }
   } catch (e) {
-    view.innerHTML = `<div class="card empty">No se pudo conectar con la API de JEV Guard. ¿Está corriendo el servidor?<br><span class="error">${e.message}</span></div>`;
+    view.innerHTML = `<div class="card empty"><strong>No se pudo conectar con la API de JEV Guard</strong>¿Está corriendo el servidor?<br><span class="error">${e.message}</span></div>`;
     return;
   }
   initStream();
@@ -165,9 +198,9 @@ async function boot() {
     else location.hash = "#/laboratorio";
   });
   on("pending-changed", refreshPending);
-  on("toast", toast);
+  on("toast", (t) => (typeof t === "string" ? toast(t) : toast(t.message, t)));
   window.addEventListener("hashchange", route);
-  route();
+  render();
 }
 
 boot();

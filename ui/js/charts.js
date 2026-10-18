@@ -128,3 +128,20 @@ export function stacked(rows, keys, width, { labelWidth = 120 } = {}) {
   return `${legend}<div class="chart"><svg width="${width}" height="${h}" role="img">
     <line class="base-line" x1="${labelWidth}" x2="${labelWidth}" y1="0" y2="${h}"/>${body}</svg></div>`;
 }
+
+/** Tendencia reciente sin ejes, junto a una cifra. values: números en orden temporal. */
+export function sparkline(values, width, height = 36, { label = "" } = {}) {
+  const n = values.length;
+  if (n < 2) return `<div class="chart spark" style="height:${height}px"></div>`;
+  const max = Math.max(1, ...values);
+  const pad = 4;
+  const x = (i) => pad + (i / (n - 1)) * (width - pad * 2);
+  const y = (v) => height - pad - (v / max) * (height - pad * 2);
+  const pts = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`);
+  const area = `M${x(0)},${height - pad}L${pts.join("L")}L${x(n - 1)},${height - pad}Z`;
+  const last = values[n - 1];
+  return `<div class="chart spark"><svg width="${width}" height="${height}" role="img" aria-label="${esc(label)}">
+    <path class="spark-area" d="${area}"/><path class="spark-line" d="M${pts.join("L")}"/>
+    <circle class="spark-dot" cx="${x(n - 1)}" cy="${y(last)}" r="4"/>
+    <rect class="hit" x="0" y="0" width="${width}" height="${height}" data-tip="${esc(label)}"/></svg></div>`;
+}

@@ -37,7 +37,9 @@ La interfaz tiene cuatro pantallas:
 - **Bandeja:** las acciones retenidas, para aprobarlas o rechazarlas.
 - **Métricas:** calidad frente a etiquetas, rutas de decisión, latencia y costo.
 
-Es HTML y JavaScript sin compilación, servido por la misma API. No necesita Node.
+Es HTML y JavaScript sin compilación, servido por la misma API. No necesita Node. Se maneja también con el teclado: `1` a `4` cambian de pantalla, `Espacio` arranca o detiene la simulación, `J`, `K`, `A` y `R` operan la Bandeja, y `?` muestra todos los atajos.
+
+El sistema de diseño y los criterios de UX del front viven en la skill de proyecto `.claude/skills/jev-guard-ui/`. Cualquier cambio de interfaz debe seguirla.
 
 ## Integrar a tus agentes
 

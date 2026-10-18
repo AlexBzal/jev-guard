@@ -14,7 +14,61 @@ const ICONS = {
   stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
   flask: '<path d="M9 3h6M10 3v6L5 19a1.5 1.5 0 0 0 1.3 2h11.4A1.5 1.5 0 0 0 19 19l-5-10V3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
   trash: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  pulse: '<path d="M3 12h4l2-6 4 12 2-6h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  inbox: '<path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5M4 13l2.5-7h11L20 13M4 13h4.5l1 2h5l1-2H20" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
+  chevron: '<path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
+  sparkle: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>',
 };
+
+// Glosario: los términos propios del sistema se explican la primera vez que aparecen.
+export const GLOSSARY = {
+  jev: "JEV es el modelo de TypeSafe AI que responde preguntas tipadas (sí/no, escala u opciones) en milisegundos, con una probabilidad calibrada.",
+  impacto: "Cuántas personas o registros afecta la acción y si se puede deshacer. A mayor impacto, umbrales más estrictos.",
+  certeza: "Qué tan seguro está JEV de su respuesta, de 0 a 1. Con poca certeza, el guardián no actúa solo: escala.",
+  riesgo: "Combinación de todas las señales de JEV, de 0 a 1. Se compara con los umbrales de retener y frenar del impacto de la acción.",
+  retenida: "La acción espera en la Bandeja a que una persona la apruebe o la rechace.",
+  reglas: "Comprobaciones exactas en código, antes de JEV: listas de baja, horarios, permisos, secretos y formato.",
+};
+
+/** Un término con su definición en tooltip y para lectores de pantalla. */
+export function term(text, key) {
+  const def = GLOSSARY[key] || "";
+  return `<span class="term" tabindex="0" data-tip="${esc(def)}" aria-label="${esc(`${text}: ${def}`)}">${esc(text)}</span>`;
+}
+
+/** Esqueletos: reservan el espacio con la forma del contenido que va a llegar. */
+export const skeleton = {
+  lines: (n = 3) => Array.from({ length: n }, (_, i) => `<div class="sk sk-line" style="width:${92 - i * 14}%"></div>`).join(""),
+  tiles: (n = 4) => `<div class="tiles">${'<div class="sk sk-block"></div>'.repeat(n)}</div>`,
+  card: (h = 180) => `<div class="card"><div class="sk" style="height:${h}px;border-radius:10px"></div></div>`,
+};
+
+/** Anima un número desde su valor actual hasta `to`, respetando el movimiento reducido. */
+export function tween(el, to, format, ms = 450) {
+  if (!el) return;
+  const from = Number(el.dataset.value ?? to);
+  el.dataset.value = String(to);
+  const reduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (reduced || from === to || !Number.isFinite(from) || !Number.isFinite(to)) { el.textContent = format(to); return; }
+  const t0 = performance.now();
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / ms);
+    const e = 1 - (1 - k) ** 3;
+    el.textContent = format(from + (to - from) * e);
+    if (k < 1 && el.dataset.value === String(to)) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+/** Tiempo relativo en español: "hace 5 s", "hace 3 min". */
+export function relTime(iso) {
+  if (!iso) return "";
+  const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+  if (s < 60) return `hace ${s} s`;
+  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+  return `hace ${Math.round(s / 3600)} h`;
+}
 
 export const icon = (name) => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ""}</svg>`;
 
@@ -166,10 +220,21 @@ export function closeDrawer() {
   if (lastFocus) lastFocus.focus();
 }
 
-export function toast(message) {
+/** Aviso breve. Con `action`, muestra un botón (por ejemplo "Deshacer"). */
+export function toast(message, { action, onAction, duration = 3200 } = {}) {
   const el = document.createElement("div");
   el.className = "toast";
-  el.textContent = message;
+  const text = document.createElement("span");
+  text.textContent = message;
+  el.appendChild(text);
+  let timer = setTimeout(() => el.remove(), duration);
+  if (action) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = action;
+    btn.addEventListener("click", () => { clearTimeout(timer); el.remove(); onAction?.(); });
+    el.appendChild(btn);
+  }
   document.getElementById("toasts").appendChild(el);
-  setTimeout(() => el.remove(), 3200);
+  return { close: () => { clearTimeout(timer); el.remove(); } };
 }

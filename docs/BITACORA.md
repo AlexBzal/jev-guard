@@ -158,6 +158,34 @@ Con estos cambios, el perfil 30X sigue en 49 de 49 en desarrollo y mejora de 24 
 1. **Una edición dejó un salto de línea literal dentro de un texto de JavaScript.** Todos los módulos que importaban ese archivo fallaron, y la interfaz quedó en blanco sin errores visibles en la consola. La comprobación con `node --check` no lo detectó, porque trata el archivo como CommonJS. Se agregó una prueba que importa cada módulo de la interfaz con Node.
 2. **El ejemplo con `curl` del README fallaba en Windows,** porque `curl` envía los acentos con la codificación local. El ejemplo quedó sin acentos y con una nota.
 
+## 2026-10-18: rediseño del front con una skill de diseño propia
+
+No había una skill de diseño aplicable: la única instalada pertenece a otro producto, con su propia marca. Se creó la skill de proyecto `.claude/skills/jev-guard-ui/` con `skill-creator`. Recoge los principios de UX (una tarea por pantalla, la respuesta primero, lenguaje de negocio, estado nunca solo en color, nada salta, movimiento que explica, teclado de primera clase), los tokens del sistema de diseño, el inventario de componentes y la lista de verificación. Se complementa con la skill `dataviz` para los gráficos.
+
+### Cambios aplicados
+
+- **Estructura:** barra lateral con navegación, empresa activa y estado del motor. En móvil pasa a una barra inferior. Transiciones suaves entre vistas.
+- **En vivo:** acción primaria en el encabezado, cifra principal animada con tendencia del último minuto, y el bloque "cómo se decidió cada acción", que muestra cuántas resolvió cada capa (reglas, JEV, LLM) y la proporción de veredictos. El flujo se pausa al pasar el cursor para poder leerlo.
+- **Laboratorio:** la respuesta primero. El veredicto, la ruta y las razones van arriba, y los pasos van debajo en tarjetas plegables que recuerdan si las abriste. La columna del resultado queda fija.
+- **Bandeja:** bandeja de entrada de dos columnas, operable con J, K, A y R. La decisión es optimista y se puede deshacer durante 4 segundos. Se guarda aunque se cierre la pestaña.
+- **Métricas:** una frase en lenguaje claro resume si se puede confiar, antes de las cifras y los gráficos.
+- **Comprensión:** los términos propios (JEV, impacto, certeza, riesgo, reglas, retenida) tienen su definición al pasar el cursor o con el teclado.
+- **Fluidez:** esqueletos de carga en lugar de "Cargando…", contadores animados y tiempos relativos.
+- **Accesibilidad:** diálogo de atajos con `?`, tooltips también con el teclado, movimiento reducido respetado.
+
+### Verificación
+
+- Recorrido en navegador según la lista de la skill. Se verificó el arranque de agentes con Espacio, el descuento falso que pasa a "Frenada" en el Laboratorio, la Bandeja con J, R y Deshacer (de 100 a 99 y de nuevo a 100, con la selección restaurada), las Métricas, el modo oscuro y el móvil a 390 px sin desplazamiento horizontal.
+- Cero errores de consola y cero peticiones fallidas.
+- Ningún nombre de empresa escrito en `ui/`.
+- 77 pruebas automatizadas pasan.
+
+### Encontrado y corregido durante la verificación
+
+- El fondo de la barra lateral terminaba en las páginas largas.
+- La lista de la Bandeja mostraba el identificador técnico del agente en lugar de su nombre.
+- El atajo "Espacio" aparecía en el botón en móvil, donde no aplica.
+
 ### Pendiente
 
 - Correr `scripts/smoke_jev.py` y `scripts/eval.py` con una clave real de TypeSafe. Validar que las instrucciones en español rinden bien, especialmente en las preguntas propias de cada perfil, y comparar contra el simulador.

@@ -2,6 +2,7 @@
 
 import { api } from "../api.js";
 import { columns, hbars, stacked, tableView } from "../charts.js";
+import { skeleton } from "../components.js";
 import { ROUTE, actionTypeLabel, dec, esc, int, ms, pct, usd } from "../format.js";
 import { on, store } from "../state.js";
 
@@ -20,11 +21,12 @@ export function mount(el) {
   el.innerHTML = `
     <div class="page-head">
       <div>
-        <h1>¿Cómo sabemos que funciona?</h1>
-        <p>La calidad se mide contra etiquetas: las revisiones de la bandeja, la auditoría de una muestra de decisiones automáticas y, en la demo, la etiqueta de cada caso simulado.</p>
+        <div class="eyebrow">Métricas</div>
+        <h1>¿Podemos confiar en el guardián?</h1>
+        <p class="lead">La calidad se mide contra etiquetas: las revisiones de la Bandeja, la auditoría de una muestra de decisiones automáticas y, en la demo, la etiqueta de cada caso simulado.</p>
       </div>
     </div>
-    <div id="m-body"><div class="card empty">Cargando…</div></div>`;
+    <div id="m-body">${skeleton.card(70)}<div style="height:16px"></div>${skeleton.tiles(4)}${skeleton.card(220)}</div>`;
 
   const body = el.querySelector("#m-body");
   let data = null;
@@ -52,8 +54,13 @@ export function mount(el) {
     const jevPer1000 = m.cost_per_1000_usd;
     const llmPer1000 = m.llm_judge_cost_per_1000_usd;
 
+    const caught = q.unsafe ? `De <b>${int(q.unsafe)}</b> acciones inseguras etiquetadas, el guardián detuvo <b>${pct(q.unsafe_caught)}</b>` : "Todavía no hay acciones inseguras etiquetadas";
+    const fa = q.unsafe ? ` y <b>${int(q.false_allow)}</b> ${q.false_allow === 1 ? "pasó sola" : "pasaron solas"}.` : ".";
+    const fb = q.false_block_rate != null ? ` Frenó por error el <b>${pct(q.false_block_rate)}</b> de las seguras.` : "";
+    const cost = m.cost_per_1000_usd != null ? ` Cada 1.000 decisiones cuestan <b>${usd(m.cost_per_1000_usd)}</b>.` : "";
     body.innerHTML = `
-      ${m.simulated_jev ? '<p class="small ink2" style="margin:0 0 12px">Con JEV simulado, estas cifras miden las heurísticas locales, no a JEV. La latencia no incluye la red.</p>' : ""}
+      <div class="card" style="margin-bottom:16px"><p class="headline">${caught}${fa}${fb}${cost}</p>
+        ${m.simulated_jev ? '<p class="small muted" style="margin:8px 0 0">Con JEV simulado, estas cifras miden las heurísticas locales, no a JEV. La latencia no incluye la red.</p>' : ""}</div>
       <div class="tiles five">
         ${tile("Inseguras detenidas", pct(q.unsafe_caught), `de ${int(q.unsafe)} inseguras etiquetadas`)}
         ${tile("Inseguras que pasaron solas", int(q.false_allow), "la métrica que más importa", q.false_allow === 0 ? "good" : "")}
