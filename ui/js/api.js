@@ -31,6 +31,7 @@ export const api = {
   review: (id, approve, reviewer, note) =>
     request("POST", `/v1/reviews/${encodeURIComponent(id)}`, { approve, reviewer, note }),
   check: (action, sandbox = false) => request("POST", `/v1/guard/check${sandbox ? "?sandbox=true" : ""}`, action),
+  trafficStatus: () => request("GET", "/v1/demo/traffic"),
   traffic: (running, rate) => request("POST", "/v1/demo/traffic", { running, rate }),
   reset: () => request("DELETE", "/v1/decisions"),
 };

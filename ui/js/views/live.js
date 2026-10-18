@@ -194,7 +194,16 @@ export function mount(el) {
     }),
     on("reset", () => { items.length = 0; queue = []; renderFeed(); loadMetrics(); }),
   ];
-  const timer = setInterval(loadMetrics, 2000);
+  // Los agentes simulados se apagan solos tras un plazo: el botón debe reflejarlo.
+  async function syncTraffic() {
+    if (!demo) return;
+    try {
+      const st = await api.trafficStatus();
+      if (store.health) store.health.traffic = st;
+      renderTraffic(st.running);
+    } catch (e) { /* reintenta */ }
+  }
+  const timer = setInterval(() => { loadMetrics(); syncTraffic(); }, 2000);
   const tick = setInterval(renderTiles, 1000);
 
   return () => {

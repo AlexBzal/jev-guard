@@ -130,6 +130,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .sim-banner strong { color: var(--ink); }
 
 main { max-width: 1320px; margin: 0 auto; padding: 24px; outline: none; }
+main:focus, main:focus-visible { outline: none; } /* recibe el foco al cambiar de pantalla; no debe dibujar contorno */
 
 /* ---------------------------------------------------------------- bloques */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }

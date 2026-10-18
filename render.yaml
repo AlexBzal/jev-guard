@@ -1,0 +1,24 @@
+# Despliegue en Render (plan gratis). Ver la sección "Desplegar en Render" del README.
+services:
+  - type: web
+    name: jev-guard
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn guard.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: JEV_GUARD_DEMO          # controles de la demo y reloj fijo
+        value: "1"
+      - key: JEV_SIM_LATENCY         # latencia realista del simulador (70-300 ms)
+        value: "1"
+      - key: JEV_GUARD_DB            # el disco del plan gratis no persiste: el registro se reinicia con el servicio
+        value: /tmp/jev-guard.db
+      - key: JEV_GUARD_TRAFFIC_MAX_S # los agentes simulados se apagan solos a los 10 minutos
+        value: "600"
+      - key: TYPESAFE_API_KEY        # opcional: si se completa, usa JEV real en vez del simulador
+        sync: false

@@ -181,3 +181,16 @@ def test_demo_endpoints(service, monkeypatch):
     assert m["decisions"] >= 3 and m["quality"]["labeled"] == m["decisions"]
     assert sum(b["count"] for b in m["latency_hist"]) == m["decisions"]
     assert client.delete("/v1/decisions").json()["status"] == "cleared"
+
+
+def test_traffic_stops_by_itself(service):
+    import time
+
+    from guard.demo import TrafficGenerator, load_scenarios
+
+    gen = TrafficGenerator(service, load_scenarios(), max_seconds=0.3)
+    gen.start(30)
+    deadline = time.time() + 3
+    while gen.running and time.time() < deadline:
+        time.sleep(0.05)
+    assert not gen.running and gen.sent >= 1
