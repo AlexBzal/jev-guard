@@ -27,6 +27,17 @@ La interfaz tiene cuatro pantallas:
 
 Es HTML y JavaScript sin compilación, servido por la misma API. No necesita Node.
 
+## Desplegar en Render
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/AlexBzal/jev-guard)
+
+El archivo `render.yaml` crea un servicio web en el plan gratis, con el modo demo activado. Cosas a tener en cuenta:
+
+- **El servicio se duerme** tras 15 minutos sin visitas y tarda cerca de un minuto en despertar. Abre el enlace un par de minutos antes de presentar.
+- **El disco no persiste:** el registro de decisiones se reinicia cada vez que el servicio se reinicia o despierta.
+- **Los controles de la demo son públicos:** cualquiera con el enlace puede arrancar los agentes simulados o reiniciar el registro. Los agentes se apagan solos a los 10 minutos.
+- **JEV real es opcional:** si completas `TYPESAFE_API_KEY` en Render, se usa JEV real en vez del simulador.
+
 ## Arranque rápido
 
 Requiere Python 3.10 o superior. Funciona sin claves: sin `TYPESAFE_API_KEY` usa un simulador local de JEV, y cada decisión lo indica.
