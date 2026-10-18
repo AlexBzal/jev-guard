@@ -71,6 +71,16 @@ def create_app(service: GuardService | None = None) -> FastAPI:
     )
     app.state.guard = service
     app.state.traffic = traffic
+    @app.middleware("http")
+    async def ui_revalidate(request: Request, call_next):
+        # La interfaz no tiene compilación ni nombres con hash: sin esto, el navegador puede
+        # mezclar un index.html nuevo con módulos viejos en caché y dejar la página en blanco.
+        response = await call_next(request)
+        path = request.url.path
+        if not path.startswith(("/v1/", "/health", "/docs", "/openapi", "/redoc")):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
     app.add_middleware(CORSMiddleware, allow_origins=os.environ.get("JEV_GUARD_CORS", "*").split(","),
                        allow_methods=["*"], allow_headers=["*"])
 

@@ -195,3 +195,10 @@ def test_traffic_stops_by_itself(service):
     while gen.running and time.time() < deadline:
         time.sleep(0.05)
     assert not gen.running and gen.sent >= 1
+
+
+def test_ui_files_are_revalidated(service):
+    client = TestClient(create_app(service))
+    assert client.get("/").headers.get("cache-control") == "no-cache"
+    assert client.get("/js/app.js").headers.get("cache-control") == "no-cache"
+    assert "cache-control" not in client.get("/health").headers
